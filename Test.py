@@ -3,6 +3,9 @@ import random
 from math import sqrt
 from pyglet.gl import *
 from pyglet.window import key
+from Polygon import Polygon
+from Vector import Vector
+from BoundingBox import BoundingBox
 
 # TODO intersection of polygons
 # TODO triangulation
@@ -25,75 +28,7 @@ label = pyglet.text.Label('Midpoint displacement test',
 def drawLineSegment(p1, p2):
     glVertex2f(p1.x, p1.y)
     glVertex2f(p2.x, p2.y)
-    
-    
-class BoundingBox:
-    # improve speed by storing extents and center?
-    def __init__(self, minX, minY, maxX, maxY):
-        self.minX = minX
-        self.minY = minY
-        self.maxX = maxX
-        self.maxY = maxY
-        
-    def add(self, x, y):
-        if self.minX > x:
-            self.minX = x
-        if self.maxX < x:
-            self.maxX = x
-        if self.minY > y:
-            self.minY = y
-        if self.maxY < y:
-            self.maxY = y
-            
-    def draw(self):
-        glColor3ub(0x10, 0xA7, 0xE3)
-        glBegin(GL_POLYGON)
-        glVertex2f(self.minX, self.minY)
-        glVertex2f(self.maxX, self.minY)
-        glVertex2f(self.maxX, self.maxY)
-        glVertex2f(self.minX, self.maxY)           
-        glEnd()
-        
-    def center(self):
-        return Vector( (self.minX+self.maxX)/2, (self.minY+self.maxY)/2)
-        
-    def extents(self):
-        return Vector( (self.maxX-self.minX)/2, (self.maxY-self.minY)/2 )
-        
-    def overlaps(self, other):
-        # http://www.gamasutra.com/view/feature/131790/simple_intersection_tests_for_games.php?page=3
-        t = other.center().subtract(self.center())
-        
-        selfExtents = self.extents()
-        otherExtents = other.extents()
-
-        return abs(t.x) <= (selfExtents.x+otherExtents.x) and abs(t.y) <= (selfExtents.y+otherExtents.y)    
-    
-class Vector:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        
-    def cross(self, other):
-        return self.x*other.y - self.y*other.x
-        
-    def add(self, other):
-        return Vector(self.x+other.x, self.y+other.y)
-        
-    def subtract(self, other):
-        return Vector(self.x-other.x, self.y-other.y)
-        
-    def multiply(self, value):
-        return Vector(self.x * value, self.y * value)
-        
-    def log(self):
-        print str(self.x) + ", " + str(self.y)
-        
-    def draw(self):
-        glBegin(GL_POINTS)
-        glVertex2f(self.x, self.y)
-        glEnd()
-        
+   
 class Actor:
     def __init__(self):
         self.speed = Vector(0, 0)
@@ -135,122 +70,14 @@ class Actor:
         self.bbox = BoundingBox(self.location.x-self.width/2, self.location.y-self.height/2,
                                 self.location.x+self.width/2, self.location.y+self.height/2)
     
-    
-class Polygon:
-    def __init__(self):
-        self.vertices = []
-    
-    def addVertex(self, p):
-        self.vertices.append(p)
-        self.updateBoundingBox()
-        
-    def draw(self):
-        glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
-        # glColor3d (.9, .9, .9)
-        glColor3d (.1, .1, .1)
-        self.__privateDraw__()
-        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
-        glEnable(GL_POLYGON_OFFSET_LINE);
-        glColor3d (1., 1., 1.);
-        glPolygonOffset(-1.,-1.);
-        self.__privateDraw__()
-        
-    def __privateDraw__(self):
-        glBegin(GL_POLYGON)
-        size = len(self.vertices)
-        for vertex in range(size):
-            drawLineSegment(self.vertices[vertex], self.vertices[(vertex+1)%size])
-        glEnd()
-        
-    def collision(self, actor):
-    
-        if not actor.bbox.overlaps(self.bbox):
-            return False, Vector(0,0)
-        # Line segment 1: p + t*r
-        # Line segment 2: q + u*s
-        p = Vector(actor.location.x, actor.location.y-actor.height/2)
-        r = Vector(0, actor.height-1)
-
-        size = len(self.vertices)
-        for vertex in range(size):
-            # t = (q - p) x s /(r x s)
-            # u = (q - p) x r /(r x s)
-            q = self.vertices[vertex]
-            qPlusS = self.vertices[(vertex+1)%size]
-            
-            s = qPlusS.subtract(q)
-            rCrossS = r.cross(s)
-            qMinusP = q.subtract(p)
-            rhsT = qMinusP.cross(s)
-            t = rhsT/rCrossS
-            rhsR = qMinusP.cross(r)
-            u = rhsR/rCrossS
-            
-            if t >= 0 and t < 1 and u >= 0 and u < 1:
-                return True, p.add(r.multiply(t)).add(r.multiply(0.5))
-        return False, Vector(0,0)
-    
-    def cut(self, other):
-        sizeSelf = len(self.vertices)
-        sizeOther = len(other.vertices)
-        # Line segment 1: p + t*r
-        # Line segment 2: q + u*s
-        for vertexSelf in range(sizeSelf):
-            p = self.vertices[vertexSelf]
-            pPlusR = self.vertices[(vertexSelf+1)%sizeSelf]
-            r = pPlusR.subtract(p)
-            for vertexOther in range(sizeOther):
-                # t = (q - p) x s /(r x s)
-                # u = (q - p) x r /(r x s)
-                q = other.vertices[vertexOther]
-                qPlusS = other.vertices[(vertexOther+1)%sizeOther]
-                
-                s = qPlusS.subtract(q)
-                rCrossS = r.cross(s)
-                qMinusP = q.subtract(p)
-                rhsT = qMinusP.cross(s)
-                t = rhsT/rCrossS
-                rhsR = qMinusP.cross(r)
-                u = rhsR/rCrossS
-                
-                if t >= 0 and t < 1 and u >= 0 and u < 1:
-                    intersect = p.add(r.multiply(t))
-                    glColor3f(0.8, 0.8, 0.2)
-                    glPointSize(6)
-                    intersect.draw()
-                    
-        
-    def magic(self):
-        size = len(self.vertices)
-        vertices = []
-        for vertex in range(size):
-            p1 = self.vertices[vertex]
-            p2 = self.vertices[(vertex+1)%size]
-            line = Line(p1.x, p1.y, p2.x, p2.y)
-            vertices.append(p1)
-            factor = 10
-            p = line.perpendicularVector()
-            r = factor - random.random()*factor*2
-            x = (line.x1 + line.x2)/2 + r*p.x
-            y = (line.y1 + line.y2)/2 + r*p.y
-            vertices.append(Vector(x, y))
-        self.vertices = vertices
-        self.updateBoundingBox()
-        
-    def updateBoundingBox(self):
-        size = len(self.vertices)
-        self.bbox = BoundingBox(0,0,0,0)
-        for vertex in range(size):
-            self.bbox.add(self.vertices[vertex].x, self.vertices[vertex].y)
-            
-            
+     
         
 def createBoundingBoxPolygon(pMin, pMax):
     p = Polygon()
-    p.addVertex(Vector(pMin.x, pMin.y))
-    p.addVertex(Vector(pMax.x, pMin.y))
-    p.addVertex(Vector(pMax.x, pMax.y))
     p.addVertex(Vector(pMin.x, pMax.y))
+    p.addVertex(Vector(pMax.x, pMax.y))
+    p.addVertex(Vector(pMax.x, pMin.y))
+    p.addVertex(Vector(pMin.x, pMin.y))
     return p
 
 
@@ -328,6 +155,7 @@ polygon.magic()
 polygon.magic()
 polygon.magic()
 polygon.magic()
+#polygon.triangulate()
 polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
 polygon2.magic()
 polygon2.magic()
@@ -360,8 +188,9 @@ def on_draw():
     polygon.draw()
     label.draw()
     polygon.bbox.draw()
-    polygon2.draw()
+    #polygon2.draw()
     polygon.cut(polygon2)
+    polygon.triangulate()
     
 def drawLine(line):
     glVertex2f(line.x1, line.y1)
@@ -404,6 +233,7 @@ def on_key_release(symbol, modifiers):
 def update(dt):
     # move the actor
     a = 10
+    aStop = 20
     a_jump = 5
     
     global actor
@@ -413,11 +243,21 @@ def update(dt):
     global pressedJump
     
     if pressedLeft:
-        actor.accelerate(Vector(-a, 0), dt)
+        if actor.speed.x > 0:
+            actor.accelerate(Vector(-aStop, 0), dt)
+        else:
+            actor.accelerate(Vector(-a, 0), dt)
     elif pressedRight:
-        actor.accelerate(Vector(a, 0), dt)
-    else:
+        if actor.speed.x < 0:
+            actor.accelerate(Vector(aStop, 0), dt)
+        else:
+            actor.accelerate(Vector(a, 0), dt)
+    elif abs(actor.speed.x) < 2:
         actor.speed.x = 0
+    elif actor.speed.x < 0:
+        actor.accelerate(Vector(aStop, 0), dt)
+    else: #actor.speed.x > 0
+        actor.accelerate(Vector(-aStop, 0), dt)
                 
     if pressedJump and actor.canJump:
         actor.canJump = False
