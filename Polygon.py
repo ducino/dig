@@ -158,7 +158,7 @@ class Polygon:
         def remove(self, edge):
             self.edges.remove(edge)
             
-        def leftOf(self, v):
+        def edgeLeftOf(self, v):
             d = sys.float_info.max
             e = None
             for edge in self.edges:
@@ -168,7 +168,7 @@ class Polygon:
                         if d > de:
                             d = de
                             e = edge
-            return edge
+            return e
             
     
     def triangulate(self):
@@ -245,23 +245,70 @@ class Polygon:
         # Handling each vertex depends on the type of the vertex
         for vertex in sortedVertices:
             print vertex
+            v = self.vertices[vertex]
             if vertexType[vertex] == startVertex:
                 e = edges[vertex] 
                 e.setHelper(vertex)
                 # Add e to searchtree
                 tree.add(e)
-            elif vertexType[vertex] == endVertex:
-                e = edges[(vertex+1)%size]
-                helper = e.helper
+            elif vertexType[vertex] == endVertex or vertexType[vertex] == mergeVertex:
+                # Perform actions which are the same of end or merge vertices
+                eiPlus1 = edges[(vertex+1)%size]
+                helper = eiPlus1.helper
                 # Add a diagonal if helper(e_i+1) is a merge vertex
                 if vertexType[helper] == mergeVertex:
                     diagonals.append(Polygon.Diagonal(vertex, helper))
-                # Delete e from searchtree
-                tree.remove(e)
+                # Delete e_i+1 from searchtree
+                tree.remove(eiPlus1)
+                # Perform actions which are unique to a merge vertex
+                if vertexType[vertex] == mergeVertex:
+                    # Find edge directly to the left of vertex
+                    ej = tree.edgeLeftOf(v)
+                    if vertexType[ej.helper] == mergeVertex:
+                        diagonals.append(Polygon.Diagonal(vertex, ej.helper))
+                        # Set vertex as new helper
+                        ej.helper = vertex
             elif vertexType[vertex] == splitVertex:
-                print "todo"
-                    
-                
+                # Find edge directly to the left of vertex
+                ej = tree.edgeLeftOf(v)
+                diagonals.append(Polygon.Diagonal(vertex, ej.helper))
+                # Set vertex as new helper
+                ej.helper = vertex
+                ei = edges[vertex]
+                # Add e_i to tree and set vertex as helper
+                ei.helper = vertex
+                tree.add(ei)
+            elif vertexType[vertex] == regularVertex:
+                #If the interior of the polygon lies right of this vertex
+                if self.vertices[vertex-1].y <= v.y and \
+                   self.vertices[(vertex+1)%size].y > v.y:
+                    eiPlus1 = edges[(vertex+1)%size]
+                    helper = eiPlus1.helper
+                    # Add a diagonal if helper(e_i+1) is a merge vertex
+                    if vertexType[helper] == mergeVertex:
+                        diagonals.append(Polygon.Diagonal(vertex, helper))
+                    # Delete e_i+1 from searchtree
+                    tree.remove(eiPlus1)
+                    # Add e_i to tree and set vertex as helper
+                    ei = edges[vertex]
+                    ei.helper = vertex
+                    tree.add(ei)
+                else:
+                    # Find edge directly to the left of vertex
+                    ej = tree.edgeLeftOf(v)
+                    if vertexType[ej.helper] == mergeVertex:
+                        diagonals.append(Polygon.Diagonal(vertex, ej.helper))
+                        # Set vertex as new helper
+                        ej.helper = vertex
+        
+        for diag in diagonals:
+            v1 = self.vertices[diag.v1]
+            v2 = self.vertices[diag.v2]
+            glColor3f(1., 1., .2)
+            glBegin(GL_LINES)
+            glVertex2f(v1.x, v1.y)
+            glVertex2f(v2.x, v2.y)
+            glEnd()
                 
         # Monotone decomposition        
         for vertex in range(size):
