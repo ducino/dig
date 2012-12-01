@@ -31,6 +31,21 @@ class Polygon:
             glVertex2f(self.vertices[vertex].x, self.vertices[vertex].y)
             glVertex2f(self.vertices[(vertex+1)%size].x, self.vertices[(vertex+1)%size].y)
         glEnd()
+    
+    # Line segment 1: p + t*r
+    # Line segment 2: q + u*s
+    @staticmethod
+    def __LineSegmentIntersection__(p, r, q, s):
+        rCrossS = r.cross(s)
+        if rCrossS == 0:
+            return -1, -1
+        qMinusP = q.subtract(p)
+        rhsT = qMinusP.cross(s)
+        t = rhsT/rCrossS
+        rhsR = qMinusP.cross(r)
+        u = rhsR/rCrossS
+        
+        return t, u
         
     def collision(self, actor):
     
@@ -46,19 +61,123 @@ class Polygon:
             # t = (q - p) x s /(r x s)
             # u = (q - p) x r /(r x s)
             q = self.vertices[vertex]
-            qPlusS = self.vertices[(vertex+1)%size]
-            
+            qPlusS = self.vertices[(vertex+1)%size]            
             s = qPlusS.subtract(q)
-            rCrossS = r.cross(s)
-            qMinusP = q.subtract(p)
-            rhsT = qMinusP.cross(s)
-            t = rhsT/rCrossS
-            rhsR = qMinusP.cross(r)
-            u = rhsR/rCrossS
+            
+            t, u = Polygon.__LineSegmentIntersection__(p, r, q, s)
             
             if t >= 0 and t < 1 and u >= 0 and u < 1:
                 return True, p.add(r.multiply(t)).add(r.multiply(0.5))
         return False, Vector(0,0)
+        
+    def solveSelfIntersections(self):
+        return self # TODO remove
+        # Try solving the self intersections by swapping vertices
+        # at the locations where self intersection occurs
+        p1 = self
+        p2 = self.__internalSolveSelfIntersections1__()
+        count = 0
+        while not p1 == p2 and count < 16:
+            p1 = p2
+            p2 = p1.__internalSolveSelfIntersections1__()
+            count = count +1
+        
+        # If the first attempt failed
+        # Start dropping parts (the smalles) of the self intersecting polygon
+        if not p1 == p2 and count == 16:
+            p1, p2 = self.__internalSolveSelfIntersections2__()
+            if len(p1.vertices) > len(p2.vertices):
+                return p1.solveSelfIntersections()
+            else:
+                return p2.solveSelfIntersections()
+        else:
+            p2.updateBoundingBox()
+            return p2
+
+    def __selfIntersects__(self):
+        size = len(self.vertices)
+        for vertex1 in range(size):
+            p = self.vertices[vertex1]
+            pPlusR = self.vertices[(vertex1+1)%size]
+            r = pPlusR.subtract(p)
+            for vertex2 in range(vertex1, size):
+                if vertex1 == vertex2:
+                    continue
+                q = self.vertices[vertex2]
+                qPlusS = self.vertices[(vertex2+1)%size]
+                s = qPlusS.subtract(q)
+                
+                t, u = Polygon.__LineSegmentIntersection__(p, r, q, s)
+            
+                if t >= 0 and t < 1 and u >= 0 and u < 1:
+                    return True
+        return False
+    
+    def __internalSolveSelfIntersections1__(self):
+        size = len(self.vertices)
+        for vertex1 in range(size):
+            p = self.vertices[vertex1]
+            pPlusR = self.vertices[(vertex1+1)%size]
+            r = pPlusR.subtract(p)
+            for vertex2 in range(vertex1, size):
+                if vertex1 == vertex2:
+                    continue
+                q = self.vertices[vertex2]
+                qPlusS = self.vertices[(vertex2+1)%size]
+                s = qPlusS.subtract(q)
+                
+                t, u = Polygon.__LineSegmentIntersection__(p, r, q, s)
+            
+                if t >= 0 and t < 1 and u >= 0 and u < 1:
+                    print "Intersect"
+                    # Swap vertices     
+                    newP = Polygon()                    
+                    newP.vertices = self.vertices[vertex1+1:vertex2]
+                    newP.vertices.reverse()
+                    for vertex in range(vertex2, vertex1+size+1):
+                        newP.vertices.append(self.vertices[vertex%size])
+                    return newP
+                    
+        return self
+        
+    def __internalSolveSelfIntersections2__(self):
+        size = len(self.vertices)
+        for vertex1 in range(size):
+            p = self.vertices[vertex1]
+            pPlusR = self.vertices[(vertex1+1)%size]
+            r = pPlusR.subtract(p)
+            for vertex2 in range(vertex1, size):
+                if vertex1 == vertex2:
+                    continue
+                q = self.vertices[vertex2]
+                qPlusS = self.vertices[(vertex2+1)%size]
+                s = qPlusS.subtract(q)
+                
+                t, u = Polygon.__LineSegmentIntersection__(p, r, q, s)
+            
+                if t >= 0 and t < 1 and u >= 0 and u < 1:
+                    # One solution: split polygon into 2
+                    newV = p.add(r.multiply(t))
+                    polygon1 = Polygon()
+                    polygon2 = Polygon()
+                    start = vertex1
+                    stop = vertex2
+                    if vertex1 > vertex2:
+                        start = vertex2
+                        stop = vertex1
+                    polygon1.addVertex(newV)
+                    for vertex in range(start+1, stop):
+                        polygon1.addVertex(self.vertices[vertex])
+                    
+                    polygon2.addVertex(newV)
+                    for vertex in range(stop, start+size):
+                        polygon2.addVertex(self.vertices[vertex%size])
+                        
+                    return polygon1, polygon2
+        return self, None
+                        
+                        
+               
     
     def cut(self, other):
         sizeSelf = len(self.vertices)
@@ -170,7 +289,6 @@ class Polygon:
                             e = edge
             return e
             
-    
     def triangulate(self):
         size = len(self.vertices)
         if size <= 3:
@@ -182,14 +300,6 @@ class Polygon:
         regularVertex = 3
         mergeVertex = 4
         splitVertex = 5
-        
-        # test1 = Vector(1, 0)
-        # test2 = Vector(2, 0)
-        # test3 = Vector(3, 0)
-        # print "Length 1 " + str(test1.length())
-        # print "Length 2 " + str(test2.length())
-        # print "Length 3 " + str(test3.length())
-        # print "Angle 1-2-3 : " + str(Polygon.__interiorAngleGreaterThanPi__(test1, test2, test3))
         
         vertexType = []
         # Determine the type for each vertex
@@ -236,6 +346,14 @@ class Polygon:
                     break
             if not found:
                 sortedVertices.append(vertex)
+                        
+        # draw sorted vertices
+        # glColor3f(1., 1., 0.)
+        # glBegin(GL_POLYGON)
+        # for vertex in range(size):
+            # v = self.vertices[sortedVertices[vertex]]
+            # glVertex2f(v.x, v.y)
+        # glEnd()
         
         # Initialize the partition with the edges of the (possibly) not-monotone polygon
         diagonals = []
@@ -244,13 +362,12 @@ class Polygon:
         # Handle each vertex, from top to bottom the polygon
         # Handling each vertex depends on the type of the vertex
         for vertex in sortedVertices:
-            print vertex
             v = self.vertices[vertex]
             if vertexType[vertex] == startVertex:
-                e = edges[vertex] 
-                e.setHelper(vertex)
+                ei = edges[vertex] 
+                ei.setHelper(vertex)
                 # Add e to searchtree
-                tree.add(e)
+                tree.add(ei)
             elif vertexType[vertex] == endVertex or vertexType[vertex] == mergeVertex:
                 # Perform actions which are the same of end or merge vertices
                 eiPlus1 = edges[(vertex+1)%size]
@@ -282,6 +399,11 @@ class Polygon:
                 #If the interior of the polygon lies right of this vertex
                 if self.vertices[vertex-1].y <= v.y and \
                    self.vertices[(vertex+1)%size].y > v.y:
+                    # glPointSize(20)
+                    # glBegin(GL_POINTS)
+                    # glVertex2f(v.x, v.y)
+                    # glEnd()
+                    # glPointSize(1)
                     eiPlus1 = edges[(vertex+1)%size]
                     helper = eiPlus1.helper
                     # Add a diagonal if helper(e_i+1) is a merge vertex
@@ -294,6 +416,11 @@ class Polygon:
                     ei.helper = vertex
                     tree.add(ei)
                 else:
+                    glPointSize(10)
+                    glBegin(GL_POINTS)
+                    glVertex2f(v.x, v.y)
+                    glEnd()
+                    glPointSize(1)
                     # Find edge directly to the left of vertex
                     ej = tree.edgeLeftOf(v)
                     if vertexType[ej.helper] == mergeVertex:
@@ -333,16 +460,7 @@ class Polygon:
             glBegin(GL_POINTS)
             glVertex2f(v.x, v.y)
             glEnd()
-        
 
-                
-        # draw sorted vertices
-        # glColor3f(1., 1., 0.)
-        # glBegin(GL_POLYGON)
-        # for vertex in range(size):
-            # v = self.vertices[sortedVertices[vertex]]
-            # glVertex2f(v.x, v.y)
-        # glEnd()
     
     # check if two vertices are on the same edge, given their indices
     def __onSameEdge__(self, i1, i2):
@@ -354,6 +472,7 @@ class Polygon:
         
     def magic(self):
         size = len(self.vertices)
+        oldVertices = list(self.vertices)
         vertices = []
         for vertex in range(size):
             p1 = self.vertices[vertex]
@@ -366,7 +485,11 @@ class Polygon:
             y = (p1.y + p2.y)/2 + r*p.y
             vertices.append(Vector(x, y))
         self.vertices = vertices
+        if self.__selfIntersects__():
+            self.vertices = oldVertices
+            self.magic()
         self.updateBoundingBox()
+       
         
     def updateBoundingBox(self):
         size = len(self.vertices)

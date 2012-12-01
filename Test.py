@@ -155,10 +155,12 @@ polygon.magic()
 polygon.magic()
 polygon.magic()
 polygon.magic()
+polygon = polygon.solveSelfIntersections()
 #polygon.triangulate()
 polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
 polygon2.magic()
 polygon2.magic()
+polygon2 = polygon2.solveSelfIntersections()
 createWorld(world)    
 
 @window.event
@@ -185,14 +187,19 @@ def on_draw():
     actor.draw()
     #actor.bbox.draw()
     #world.draw()
-    polygon.draw()
+    #polygon.draw()
     label.draw()
     polygon.bbox.draw()
     #polygon2.draw()
     #polygon.cut(polygon2)
     #polygon.triangulate()
     polygon2.draw()
-    polygon2.triangulate()
+    try:
+        polygon2.triangulate()
+        print "ok"
+    except:
+        print "Error"
+        #polygon2.triangulate()
     
 def drawLine(line):
     glVertex2f(line.x1, line.y1)
@@ -219,6 +226,12 @@ def on_key_press(symbol, modifiers):
         pressedRight = True
     if symbol == key.SPACE:
         pressedJump = True
+    if symbol == key.A:
+        global polygon2
+        polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
+        polygon2.magic()
+        polygon2.magic()
+        polygon2 = polygon2.solveSelfIntersections()
         
 @window.event
 def on_key_release(symbol, modifiers):
