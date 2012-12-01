@@ -189,8 +189,10 @@ def on_draw():
     label.draw()
     polygon.bbox.draw()
     #polygon2.draw()
-    polygon.cut(polygon2)
-    polygon.triangulate()
+    #polygon.cut(polygon2)
+    #polygon.triangulate()
+    polygon2.draw()
+    polygon2.triangulate()
     
 def drawLine(line):
     glVertex2f(line.x1, line.y1)

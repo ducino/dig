@@ -32,6 +32,9 @@ class Vector:
         
     def cosAngle(self, other):
         return self.dot(other) / ( self.length() * other.length() )
+
+    def above(self, other):
+        return self.y > other.y or (self.y == other.y and self.x > other.x)
         
     def log(self):
         print str(self.x) + ", " + str(self.y)
