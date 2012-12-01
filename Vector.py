@@ -9,6 +9,9 @@ class Vector:
     def cross(self, other):
         return self.x*other.y - self.y*other.x
         
+    def dot(self, other):
+        return self.x*other.x + self.y*other.y
+        
     def add(self, other):
         return Vector(self.x+other.x, self.y+other.y)
         
@@ -23,6 +26,12 @@ class Vector:
         if d == 0:
             return Vector(1, 0)
         return Vector(-self.y / d, self.x / d)
+        
+    def length(self):
+        return sqrt(self.dot(self))
+        
+    def cosAngle(self, other):
+        return self.dot(other) / ( self.length() * other.length() )
         
     def log(self):
         print str(self.x) + ", " + str(self.y)

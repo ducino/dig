@@ -2,6 +2,7 @@ from pyglet.gl import *
 from Vector import Vector
 from BoundingBox import BoundingBox
 import random
+from math import acos
 
 class Polygon:
     def __init__(self):
@@ -89,27 +90,55 @@ class Polygon:
     
     @staticmethod
     def __leftOf__(v1, v2):
-        return v1.x < v2.x or (v1.x == v2.x and v1.y > v2.y)     
+        return v1.x < v2.x or (v1.x == v2.x and v1.y > v2.y)
+        
+    @staticmethod
+    def __angleVertices__(v1, v2, v3):
+        cosVertices = v2.subtract(v1).cosAngle(v3.subtract(v2))
+        angle = acos(cosVertices)
+        return angle
+    
+    @staticmethod
+    def __interiorAngleGreaterThanPi__(v1, v2, v3):
+        cross = v2.subtract(v1).cross(v3.subtract(v2))
+        if cross < 0:
+            return true
+        return false
+        
+        
         
     def triangulate(self):
-        # Monotone decomposition
-        # v1; v2; : : : ; vni sorted left to right.
-        # Push v1; v2 onto stack.
-        # for i = 3 to n do
-        #   if vi and top(stack) on same chain
-        #       Add diagonals vivj; : : : ; vivk, where
-        #       vk is last to admit legal diagonal
-        #       Pop vj; : : : ; vk1 and Push vi
-        #   else
-        #       Add diagonals from vi to all vertices
-        #       on the stack and pop them
-        #       Save vtop; Push vtop and vi
-        
-        # Sort vertices left to right
-        sortedVertices = []
         size = len(self.vertices)
         if size <= 3:
             return
+        # Monotone decomposition
+        # Computation Geometry Algorithms and Applications, page 50
+        startVertex = 1
+        endVertex = 2
+        regularVertex = 3
+        mergeVertex = 4
+        splitVertex = 5
+        
+        test1 = Vector(0, 1)
+        test2 = Vector(1, 0)
+        test3 = Vector(1, 1)
+        print "Length 1 " + str(test1.length())
+        print "Length 2 " + str(test2.length())
+        print "Length 3 " + str(test3.length())
+        print "Angle 1-2 : " + str(Polygon.__angleVertices__(test1, test3, test2))
+        
+        vertexType = []
+        # Determine type vertices
+        for vertex in range(size):
+            v = self.vertices[vertex]
+            vPrev = self.vertices[(vertex-1+size)%size]
+            vNext = self.vertices[(vertex+1)%size]
+            cross = v.subtract(vPrev)
+        
+        
+        # Sort vertices left to right
+        sortedVertices = []
+        
         for vertex in range(size):
             v = self.vertices[vertex]
             sizeSorted = len(sortedVertices)
@@ -134,8 +163,11 @@ class Polygon:
         stack.append(sortedVertices[0])
         stack.append(sortedVertices[1])
         for i in range(3, size):
-            if self.__onSameEdge__(stack[0], sortedVertices[i]):
+            current = sortedVertices[i]
+            if self.__onSameEdge__(stack[0], current):
                 print "pew"
+                
+                
                 
             
     
