@@ -13,14 +13,14 @@ class Polygon:
         self.vertices.append(p)
         self.updateBoundingBox()
         
-    def draw(self):
-        glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
+    def draw(self, r, g, b):
+        # glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
         # glColor3d (.9, .9, .9)
-        glColor3d (.1, .1, .1)
-        self.__privateDraw__()
+        # glColor3d (.1, .1, .1)
+        # self.__privateDraw__()
         glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
         glEnable(GL_POLYGON_OFFSET_LINE);
-        glColor3d (1., 1., 1.);
+        glColor3d (r, g, b);
         glPolygonOffset(-1.,-1.);
         self.__privateDraw__()
         
@@ -227,6 +227,7 @@ class Polygon:
             self.left = None
             self.right = None
             self.helper = None
+            self.visited = False
         
         def connectRight(self, other):
             self.right = other
@@ -257,16 +258,9 @@ class Polygon:
             glVertex2f(self.v2.x, self.v2.y)
             glEnd()
             glLineWidth(1)
-            
     
-    # Diagonal data structure, used for triangulation of the polygon
-    class Diagonal:
-        # v1 and v2 are the indices in the vertices list
-        def __init__(self, v1, v2):
-            self.v1 = v1
-            self.v2 = v2
         
-    # Search tree, implemented initially as a flat array
+    # Search tree, implemented initially as a flat array (Laziness)
     class Tree:
         def __init__(self):
             self.edges = []
@@ -288,6 +282,67 @@ class Polygon:
                             d = de
                             e = edge
             return e
+       
+    def __addDiagonal__(self, vi1, vi2, edges):
+        v1 = self.vertices[vi1]
+        v2 = self.vertices[vi2]
+        print "--"
+        print str(vi1) + " : " + str(v1.x) + ", " + str(v1.y)
+        print str(vi2) + " : " + str(v2.x) + ", " + str(v2.y)
+        size = len(edges)
+        e11 = edges[vi1]
+        e12 = edges[(vi1+1)%size]
+        e21 = edges[vi2]
+        e22 = edges[(vi2+1)%size]
+        
+        d1 = Polygon.Edge(v1, v2)
+        d2 = Polygon.Edge(v2, v1)
+        
+        e11.connectRight(d1)
+        d1.connectRight(e22)
+        
+        e21.connectRight(d2)
+        d2.connectRight(e12)
+        
+    def __constructDoublyLinkedEdgeList__(self, edges):
+        size = len(self.vertices)
+        for vertex in range(size):
+            v = self.vertices[vertex]
+            vPrev = self.vertices[(vertex-1)%size]
+            e = Polygon.Edge(vPrev, v)
+            if len(edges) > 0:
+                edges[-1].connectRight(e)
+            edges.append(e)
+            if len(edges) == size:
+                edges[-1].connectRight(edges[0])
+                
+                
+    def __ySortVertices__(self, sortedVertices):
+        size = len(self.vertices)
+        for vertex in range(size):
+            v = self.vertices[vertex]
+            sizeSorted = len(sortedVertices)
+            found = False
+            for index in range(sizeSorted):
+                if v.above(self.vertices[sortedVertices[index]]):
+                    sortedVertices.insert(index, vertex)
+                    found = True
+                    break
+            if not found:
+                sortedVertices.append(vertex)
+    
+    @staticmethod
+    def __constructPolygonsFromDoublyLinkedEdges__(edges, polygons):
+        for edge1 in edges:
+            if not edge1.visited:
+                edge2 = edge1
+                p = Polygon()
+                p.addVertex(edge2.v1)
+                while not edge2.visited:
+                    p.addVertex(edge2.v2)
+                    edge2.visited = True
+                    edge2 = edge2.right
+                polygons.append(p)
             
     def triangulate(self):
         size = len(self.vertices)
@@ -322,30 +377,12 @@ class Polygon:
                 
         # Construct doubly-linked edge list
         edges = []
-        for vertex in range(size):
-            v = self.vertices[vertex]
-            vPrev = self.vertices[(vertex-1)%size]
-            e = Polygon.Edge(v, vPrev)
-            if len(edges) > 0:
-                edges[-1].connectRight(e)
-            edges.append(e)
-            if len(edges) == size:
-                edges[-1].connectRight(edges[0])
+        self.__constructDoublyLinkedEdgeList__(edges)        
                 
         # Sort vertices top to bottom
         # Insertion sort
         sortedVertices = []        
-        for vertex in range(size):
-            v = self.vertices[vertex]
-            sizeSorted = len(sortedVertices)
-            found = False
-            for index in range(sizeSorted):
-                if v.above(self.vertices[sortedVertices[index]]):
-                    sortedVertices.insert(index, vertex)
-                    found = True
-                    break
-            if not found:
-                sortedVertices.append(vertex)
+        self.__ySortVertices__(sortedVertices)
                         
         # draw sorted vertices
         # glColor3f(1., 1., 0.)
@@ -356,9 +393,8 @@ class Polygon:
         # glEnd()
         
         # Initialize the partition with the edges of the (possibly) not-monotone polygon
-        diagonals = []
         tree = Polygon.Tree()        
-        
+        print "-------------"
         # Handle each vertex, from top to bottom the polygon
         # Handling each vertex depends on the type of the vertex
         for vertex in sortedVertices:
@@ -374,7 +410,7 @@ class Polygon:
                 helper = eiPlus1.helper
                 # Add a diagonal if helper(e_i+1) is a merge vertex
                 if vertexType[helper] == mergeVertex:
-                    diagonals.append(Polygon.Diagonal(vertex, helper))
+                    self.__addDiagonal__(vertex, helper, edges)
                 # Delete e_i+1 from searchtree
                 tree.remove(eiPlus1)
                 # Perform actions which are unique to a merge vertex
@@ -382,13 +418,13 @@ class Polygon:
                     # Find edge directly to the left of vertex
                     ej = tree.edgeLeftOf(v)
                     if vertexType[ej.helper] == mergeVertex:
-                        diagonals.append(Polygon.Diagonal(vertex, ej.helper))
+                        self.__addDiagonal__(vertex, ej.helper, edges)
                         # Set vertex as new helper
                         ej.helper = vertex
             elif vertexType[vertex] == splitVertex:
                 # Find edge directly to the left of vertex
                 ej = tree.edgeLeftOf(v)
-                diagonals.append(Polygon.Diagonal(vertex, ej.helper))
+                self.__addDiagonal__(vertex, ej.helper, edges)
                 # Set vertex as new helper
                 ej.helper = vertex
                 ei = edges[vertex]
@@ -408,7 +444,8 @@ class Polygon:
                     helper = eiPlus1.helper
                     # Add a diagonal if helper(e_i+1) is a merge vertex
                     if vertexType[helper] == mergeVertex:
-                        diagonals.append(Polygon.Diagonal(vertex, helper))
+                        print "Reg 1"
+                        self.__addDiagonal__(vertex, helper, edges)
                     # Delete e_i+1 from searchtree
                     tree.remove(eiPlus1)
                     # Add e_i to tree and set vertex as helper
@@ -416,61 +453,108 @@ class Polygon:
                     ei.helper = vertex
                     tree.add(ei)
                 else:
-                    glPointSize(10)
-                    glBegin(GL_POINTS)
-                    glVertex2f(v.x, v.y)
-                    glEnd()
-                    glPointSize(1)
+                    # glPointSize(10)
+                    # glBegin(GL_POINTS)
+                    # glVertex2f(v.x, v.y)
+                    # glEnd()
+                    # glPointSize(1)
                     # Find edge directly to the left of vertex
                     ej = tree.edgeLeftOf(v)
                     if vertexType[ej.helper] == mergeVertex:
-                        diagonals.append(Polygon.Diagonal(vertex, ej.helper))
+                        print "Reg 2"
+                        self.__addDiagonal__(vertex, ej.helper, edges)
                         # Set vertex as new helper
                         ej.helper = vertex
         
-        for diag in diagonals:
-            v1 = self.vertices[diag.v1]
-            v2 = self.vertices[diag.v2]
-            glColor3f(1., 1., .2)
-            glBegin(GL_LINES)
-            glVertex2f(v1.x, v1.y)
-            glVertex2f(v2.x, v2.y)
-            glEnd()
-                
-        # Monotone decomposition        
-        for vertex in range(size):
-            v = self.vertices[vertex]
-            if vertexType[vertex] == startVertex:
-                glPointSize(12)
-                glColor3f(1., 2., 2.)
-            elif vertexType[vertex] == endVertex:
-                glPointSize(3)
-                glColor3f(1., 1., 2.)
-            elif vertexType[vertex] == splitVertex:
-                glPointSize(6)
-                glColor3f(2., 1., 1.)
-            elif vertexType[vertex] == mergeVertex:
-                glPointSize(9)
-                glColor3f(2., 2., 1.)
-            else:
-                glPointSize(1)
-                glColor3f(1., 1., 1.)
+        # for diag in diagonals:
+            # v1 = self.vertices[diag.v1]
+            # v2 = self.vertices[diag.v2]
+            # glColor3f(1., 1., .2)
+            # glBegin(GL_LINES)
+            # glVertex2f(v1.x, v1.y)
+            # glVertex2f(v2.x, v2.y)
+            # glEnd()
+        
+        # Construct the monotones
+        self.monotones = []
+        Polygon.__constructPolygonsFromDoublyLinkedEdges__(edges, self.monotones)
+                        
+        # for m in self.monotones:
+            # if len(m.vertices) == 3:
+                # continue
             
-            glColor3f(1., 2., 2.)
-            glBegin(GL_POINTS)
-            glVertex2f(v.x, v.y)
-            glEnd()
+            # monotoneEdges = []
+            # m.__constructDoublyLinkedEdgeList__(monotoneEdges)
+            
+            # monotoneSortedVertices = []
+            # m.__ySortVertices__(monotoneSortedVertices)
+            
+            # stack = []
+            # stack.append(monotoneSortedVertices[0])
+            # stack.append(monotoneSortedVertices[1])
+            # for j in range(3, len(monotoneSortedVertices)):
+                # if m.__onSameEdge__(stack[-1], monotoneSortedVertices[j]):
+                    # poppedLast = stack.pop()
+                    # vStack = stack[-1]
+                    # while not Polygon.__interiorAngleGreaterThanPi__(m.vertices[vStack], m.vertices[poppedLast], m.vertices[monotoneSortedVertices[j]]):
+                        # m.__addDiagonal__(vStack, monotoneSortedVertices[j], monotoneEdges)
+                        # poppedLast = stack.pop()
+                        # if len(stack) == 0:
+                            # break;
+                        # vStack = stack[-1]
+                    
+                    # stack.append(poppedLast)
+                    # stack.append(monotoneSortedVertices[j])
+                # else:
+                    # while len(stack) > 0:
+                        # vi = stack.pop()
+                        # m.__addDiagonal__(vi, monotoneSortedVertices[j], monotoneEdges)
+                    # stack.append(monotoneSortedVertices[j-1])
+                    # stack.append(monotoneSortedVertices[j])
 
-    
+            # m.triangles = []
+            # Polygon.__constructPolygonsFromDoublyLinkedEdges__(monotoneEdges, m.triangles)
+            # for t in m.triangles:
+                # t.draw(1., 1., .2)
+            
+        for m in self.monotones:         
+            m.draw(1.0, 0.2, 0.2)
+            
+        # self.monotones[0].draw()
+        
+        
+        # Monotone decomposition        
+        # for vertex in range(size):
+            # v = self.vertices[vertex]
+            # if vertexType[vertex] == startVertex:
+                # glPointSize(12)
+            # elif vertexType[vertex] == endVertex:
+                # glPointSize(3)
+            # elif vertexType[vertex] == splitVertex:
+                # glPointSize(6)
+            # elif vertexType[vertex] == mergeVertex:
+                # glPointSize(9)
+            # else:
+                # glPointSize(1)
+            
+            # glColor3f(1., 2., 2.)
+            # glBegin(GL_POINTS)
+            # glVertex2f(v.x, v.y)
+            # glEnd()
+
     # check if two vertices are on the same edge, given their indices
     def __onSameEdge__(self, i1, i2):
         size = len(self.vertices)
         return abs(i1-i2)%size == 1
-                    
-                    
-                    
-        
-    def magic(self):
+
+    # Apply midpoint displacement to this polygon
+    # The midpoint of each line segment will be displaced randomly
+    # perpendicular to the line segment, distance between -factor and +factor
+    def midpointDisplacement(self, factor):
+        #seed = random.randint(0, 10000)
+        seed = 6160
+        print seed
+        random.seed(seed)
         size = len(self.vertices)
         oldVertices = list(self.vertices)
         vertices = []
@@ -478,7 +562,6 @@ class Polygon:
             p1 = self.vertices[vertex]
             p2 = self.vertices[(vertex+1)%size]
             vertices.append(p1)
-            factor = 10
             p = p1.subtract(p2).perpendicularVector()
             r = factor - random.random()*factor*2
             x = (p1.x + p2.x)/2 + r*p.x
@@ -486,11 +569,11 @@ class Polygon:
             vertices.append(Vector(x, y))
         self.vertices = vertices
         if self.__selfIntersects__():
+            print "uh oh"
             self.vertices = oldVertices
-            self.magic()
+            self.midpointDisplacement(factor)
         self.updateBoundingBox()
-       
-        
+
     def updateBoundingBox(self):
         size = len(self.vertices)
         self.bbox = BoundingBox(0,0,0,0)

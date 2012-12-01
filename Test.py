@@ -130,38 +130,18 @@ class Node:
         glBegin(GL_POINTS)
         glVertex2f(self.location.x, self.location.y)
         glEnd()
-        
-def midpointDisplacement(line, level, node):
-    if level == 5:
-        #drawLine(line)
-        node.add(line)
-    else:
-        factor = 20 - level*2
-        p = line.perpendicularVector()
-        r = factor - random.random()*factor*2
-        x = (line.x1 + line.x2)/2 + r*p.x
-        y = (line.y1 + line.y2)/2 + r*p.y
-        midpointDisplacement(Line(line.x1, line.y1, x, y), level + 1, node)
-        midpointDisplacement(Line(x, y, line.x2, line.y2), level + 1, node)
-        
-def createWorld(node):
-    line = Line(-window.width/2, 0, window.width/2, 0)
-    midpointDisplacement(line, 0, node)
 
 actor = Actor()
 world = Node()
 polygon = createBoundingBoxPolygon(Vector(-100, -100), Vector(100, 0))
-polygon.magic()
-polygon.magic()
-polygon.magic()
-polygon.magic()
-polygon = polygon.solveSelfIntersections()
+polygon.midpointDisplacement(10)
+polygon.midpointDisplacement(10)
+polygon.midpointDisplacement(8)
+polygon.midpointDisplacement(6)
 #polygon.triangulate()
 polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
-polygon2.magic()
-polygon2.magic()
-polygon2 = polygon2.solveSelfIntersections()
-createWorld(world)    
+polygon2.midpointDisplacement(8)
+polygon2.midpointDisplacement(6)  
 
 @window.event
 def on_draw():
@@ -193,13 +173,9 @@ def on_draw():
     #polygon2.draw()
     #polygon.cut(polygon2)
     #polygon.triangulate()
-    polygon2.draw()
-    try:
-        polygon2.triangulate()
-        print "ok"
-    except:
-        print "Error"
-        #polygon2.triangulate()
+   
+    polygon2.triangulate()
+    polygon2.draw(1., 1., 1.)
     
 def drawLine(line):
     glVertex2f(line.x1, line.y1)
@@ -229,9 +205,8 @@ def on_key_press(symbol, modifiers):
     if symbol == key.A:
         global polygon2
         polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
-        polygon2.magic()
-        polygon2.magic()
-        polygon2 = polygon2.solveSelfIntersections()
+        polygon2.midpointDisplacement(8)
+        polygon2.midpointDisplacement(6)
         
 @window.event
 def on_key_release(symbol, modifiers):
