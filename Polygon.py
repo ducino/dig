@@ -277,7 +277,7 @@ class Polygon:
             glLineWidth(1)
             
     class DCELVertex:
-        def _init__(self, v)
+        def __init__(self, v):
             self.v = v
             self.incidentEdge = None
 
@@ -363,8 +363,8 @@ class Polygon:
         # Create all twin half edges
         for i in range(size):
             currentVertex = dcelVertices[i]
-            
-            twinEdge = DCELHalfEdge(currentVertex)
+            currentEdge = currentVertex.incidentEdge
+            twinEdge = Polygon.DCELHalfEdge(currentVertex)
             currentEdge.twin = twinEdge
             twinEdge.twin = currentEdge
             
@@ -398,16 +398,17 @@ class Polygon:
     
     @staticmethod
     def __constructPolygonsFromDoublyLinkedEdges__(edges, polygons):
-        for edge1 in edges:
-            if not edge1.visited:
-                edge2 = edge1
-                p = Polygon()
-                p.addVertex(edge2.v1)
-                while not edge2.visited:
-                    p.addVertex(edge2.v2)
-                    edge2.visited = True
-                    edge2 = edge2.right
-                polygons.append(p)
+        print "todo"
+        # for edge1 in edges:
+            # if not edge1.visited:
+                # edge2 = edge1
+                # p = Polygon()
+                # p.addVertex(edge2.v1)
+                # while not edge2.visited:
+                    # p.addVertex(edge2.v2)
+                    # edge2.visited = True
+                    # edge2 = edge2.right
+                # polygons.append(p)
             
     def triangulate(self):
         size = len(self.vertices)
@@ -442,7 +443,7 @@ class Polygon:
                 
         # Construct doubly-connected edge list
         dcelVertices = []
-        self.__constructDCEL__(declVertices)    
+        self.__constructDCEL__(dcelVertices)    
                 
         # Sort vertices top to bottom
         # Insertion sort
@@ -474,7 +475,7 @@ class Polygon:
                 eiPlus1 = dcelVertices[(vertex+1)%size].incidentEdge
                 # Add a diagonal if helper(e_i+1) is a merge vertex
                 if vertexType[eiPlus1.helper] == mergeVertex:
-                    self.__addDiagonal__(vertex, eiPlus1.helper, edges)
+                    self.__addDiagonal__(vertex, eiPlus1.helper, dcelVertices)
                 # Delete e_i+1 from searchtree
                 tree.remove(eiPlus1)
                 # Perform actions which are unique to a merge vertex
@@ -482,13 +483,13 @@ class Polygon:
                     # Find edge directly to the left of vertex
                     ej = tree.edgeLeftOf(v)
                     if vertexType[ej.helper] == mergeVertex:
-                        self.__addDiagonal__(vertex, ej.helper, edges)
+                        self.__addDiagonal__(vertex, ej.helper, dcelVertices)
                         # Set vertex as new helper
                         ej.helper = vertex
             elif vertexType[vertex] == splitVertex:
                 # Find edge directly to the left of vertex
                 ej = tree.edgeLeftOf(v)
-                self.__addDiagonal__(vertex, ej.helper, edges)
+                self.__addDiagonal__(vertex, ej.helper, dcelVertices)
                 # Set vertex as new helper
                 ej.helper = vertex
                 ei = dcelVertices[vertex].incidentEdge
@@ -509,7 +510,7 @@ class Polygon:
                     # Add a diagonal if helper(e_i+1) is a merge vertex
                     if vertexType[helper] == mergeVertex:
                         print "Reg 1"
-                        self.__addDiagonal__(vertex, helper, edges)
+                        self.__addDiagonal__(vertex, helper, dcelVertices)
                     # Delete e_i+1 from searchtree
                     tree.remove(eiPlus1)
                     # Add e_i to tree and set vertex as helper
@@ -526,7 +527,7 @@ class Polygon:
                     ej = tree.edgeLeftOf(v)
                     if vertexType[ej.helper] == mergeVertex:
                         print "Reg 2"
-                        self.__addDiagonal__(vertex, ej.helper, edges)
+                        self.__addDiagonal__(vertex, ej.helper, dcelVertices)
                         # Set vertex as new helper
                         ej.helper = vertex
         
@@ -541,7 +542,7 @@ class Polygon:
         
         # Construct the monotones
         self.monotones = []
-        Polygon.__constructPolygonsFromDoublyLinkedEdges__(edges, self.monotones)
+        #Polygon.__constructPolygonsFromDoublyLinkedEdges__(edges, self.monotones)
                         
         # for m in self.monotones:
             # if len(m.vertices) == 3:
