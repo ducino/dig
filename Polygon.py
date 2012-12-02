@@ -219,27 +219,44 @@ class Polygon:
             return True
         return False
    
-    # Edge data structure, used for triangulation of the polygon
-    class Edge:
-        def __init__(self, v1, v2):
-            self.v1 = v1
-            self.v2 = v2
-            self.left = None
-            self.right = None
-            self.helper = None
-            self.visited = False
+    # Vertex data structure, used for triangulation of the polygon
+    # class Vertex:
+        # def __init__(self, v):
+            # self.v = v
+            # self.nextList = []
+            # self.nextOrder = []
+            # self.prev = None
         
-        def connectRight(self, other):
-            self.right = other
-            other.left = self
+        # def addNext(self, next):
+            # cross = self.prev.v.subtract(self.v).cross(next.v.subtract(self.v))
+            # insert = 0
+            # for n in range(len(nextList)):
+                # if self.nextOrder[n] >= cross:
+                    # insert = n
+                    # break
+                
+            # self.nextList.insert(insert, next)
+            # self.nextOrder.insert(insert, cross)
             
-        def setHelper(self, v):
-            self.helper = v
+    # Doubly Connected edge list: a data structure which can be used in monotone decomposition and triangulation of a polygon
+    class DCELHalfEdge:
+        def __init__(self, origin):
+            self.origin = origin
+            self.twin = None
+            self.next = None
+            self.prev = None
+            self.helper = None
+            
+        def start(self):
+            return self.origin.v
+        
+        def end(self):
+            return self.next.origin.v
             
         def xDistTo(self, v):
             # y - y1 = m(x - x1)
             # x = x1 + (y - y1)/m
-            m = (self.v1.y - self.v2.y) / (self.v1.x - self.v2.x)
+            m = (self.start().y - self.end().y) / (self.start().x - self.end().x)
             # glPointSize(10)
             # glBegin(GL_POINTS)
             # glVertex2f(v.x, v.y)
@@ -249,17 +266,21 @@ class Polygon:
             # glVertex2f(self.v1.x + (v.y - self.v1.y)/m, v.y)
             # glEnd()
             # self.mark()
-            return abs( v.x - (self.v1.x + (v.y - self.v1.y)/m) )
+            return abs( v.x - (self.start().x + (v.y - self.start().y)/m) )
             
         def mark(self):
             glLineWidth(10)
             glBegin(GL_LINES)
-            glVertex2f(self.v1.x, self.v1.y)
-            glVertex2f(self.v2.x, self.v2.y)
+            glVertex2f(self.start().x, self.start().y)
+            glVertex2f(self.end().x, self.end().y)
             glEnd()
             glLineWidth(1)
-    
-        
+            
+    class DCELVertex:
+        def _init__(self, v)
+            self.v = v
+            self.incidentEdge = None
+
     # Search tree, implemented initially as a flat array (Laziness)
     class Tree:
         def __init__(self):
@@ -275,47 +296,91 @@ class Polygon:
             d = sys.float_info.max
             e = None
             for edge in self.edges:
-                if (edge.v1.y > v.y and edge.v2.y <= v.y) or \
-                    (edge.v1.y <= v.y and edge.v2.y > v.y):
+                if (edge.start().y > v.y and edge.end().y <= v.y) or \
+                    (edge.start().y <= v.y and edge.end().y > v.y):
                         de = edge.xDistTo(v)
                         if d > de:
                             d = de
                             e = edge
             return e
        
-    def __addDiagonal__(self, vi1, vi2, edges):
-        v1 = self.vertices[vi1]
-        v2 = self.vertices[vi2]
-        print "--"
-        print str(vi1) + " : " + str(v1.x) + ", " + str(v1.y)
-        print str(vi2) + " : " + str(v2.x) + ", " + str(v2.y)
-        size = len(edges)
-        e11 = edges[vi1]
-        e12 = edges[(vi1+1)%size]
-        e21 = edges[vi2]
-        e22 = edges[(vi2+1)%size]
+    def __addDiagonal__(self, vi1, vi2, dcelVertices):
+        print "todo"
+        # v1 = self.vertices[vi1]
+        # v2 = self.vertices[vi2]
+        # print "--"
+        # print str(vi1) + " : " + str(v1.x) + ", " + str(v1.y)
+        # print str(vi2) + " : " + str(v2.x) + ", " + str(v2.y)
+        # size = len(edges)
+        # e11 = edges[vi1]
+        # e12 = edges[(vi1+1)%size]
+        # e21 = edges[vi2]
+        # e22 = edges[(vi2+1)%size]
         
-        d1 = Polygon.Edge(v1, v2)
-        d2 = Polygon.Edge(v2, v1)
+        # glColor3f(1., 1., .2)
+        # glBegin(GL_LINES)
+        # glVertex2f(v1.x, v1.y)
+        # glVertex2f(v2.x, v2.y)
+        # glEnd()
         
-        e11.connectRight(d1)
-        d1.connectRight(e22)
-        
-        e21.connectRight(d2)
-        d2.connectRight(e12)
-        
-    def __constructDoublyLinkedEdgeList__(self, edges):
-        size = len(self.vertices)
-        for vertex in range(size):
-            v = self.vertices[vertex]
-            vPrev = self.vertices[(vertex-1)%size]
-            e = Polygon.Edge(vPrev, v)
-            if len(edges) > 0:
-                edges[-1].connectRight(e)
-            edges.append(e)
-            if len(edges) == size:
-                edges[-1].connectRight(edges[0])
+        # d1 = Polygon.Edge(v1, v2)
+        # d2 = Polygon.Edge(v2, v1)
                 
+        # e11.connectRight(d1)
+        # d1.connectRight(e22)
+        
+        # e21.connectRight(d2)
+        # d2.connectRight(e12)
+    
+    # Construct the Doubly connected edge list
+    # \param dcelVertices A list of DCELVertex objects, must be empty
+    def __constructDCEL__(self, dcelVertices):
+        size = len(self.vertices)
+        lastVertex = None
+        previousVertex = None
+        currentVertex = None
+        # Create all DCEL Vertices with an incident edge
+        for i in range(size):
+            # Create the current vertex or use the previously stored last one, if this is the last vertex
+            v = self.vertices[i]
+            if i == size-1:
+                currentVertex = lastVertex
+            else:
+                currentVertex = Polygon.DCELVertex(v)
+            # For the first vertex, the previous one is not known yet, create it and remember it as the last vertex
+            if i == 0:                
+                vPrev = self.vertices[(i-1)%size]
+                lastVertex = Polygon.DCELVertex(vPrev)
+                previousVertex = lastVertex
+            # Create the DCEL Half Edge, origin: previous vertex
+            currentEdge = Polygon.DCELHalfEdge(previousVertex)
+            previousVertex = currentVertex
+                
+            # The incident edge of the current vertex is the previously create half edge with origin: previous vertex
+            currentVertex.incidentEdge = currentEdge
+            dcelVertices.append(currentVertex)
+        
+        # Create all twin half edges
+        for i in range(size):
+            currentVertex = dcelVertices[i]
+            
+            twinEdge = DCELHalfEdge(currentVertex)
+            currentEdge.twin = twinEdge
+            twinEdge.twin = currentEdge
+            
+        # Connect all edges
+        for i in range(size):
+            prevVertex = dcelVertices[i-1]
+            currentVertex = dcelVertices[i]
+            nextVertex = dcelVertices[(i+1)%size]
+            
+            currentEdge = currentVertex.incidentEdge
+            currentEdge.prev = prevVertex.incidentEdge
+            currentEdge.next = nextVertex.incidentEdge
+            
+            twinEdge = currentEdge.twin
+            twinEdge.prev = nextVertex.incidentEdge
+            twinEdge.next = prevVertex.incidentEdge             
                 
     def __ySortVertices__(self, sortedVertices):
         size = len(self.vertices)
@@ -375,9 +440,9 @@ class Polygon:
             else:
                 vertexType.append(regularVertex)
                 
-        # Construct doubly-linked edge list
-        edges = []
-        self.__constructDoublyLinkedEdgeList__(edges)        
+        # Construct doubly-connected edge list
+        dcelVertices = []
+        self.__constructDCEL__(declVertices)    
                 
         # Sort vertices top to bottom
         # Insertion sort
@@ -400,17 +465,16 @@ class Polygon:
         for vertex in sortedVertices:
             v = self.vertices[vertex]
             if vertexType[vertex] == startVertex:
-                ei = edges[vertex] 
-                ei.setHelper(vertex)
+                ei = dcelVertices[vertex].incidentEdge
+                ei.helper = vertex
                 # Add e to searchtree
                 tree.add(ei)
             elif vertexType[vertex] == endVertex or vertexType[vertex] == mergeVertex:
                 # Perform actions which are the same of end or merge vertices
-                eiPlus1 = edges[(vertex+1)%size]
-                helper = eiPlus1.helper
+                eiPlus1 = dcelVertices[(vertex+1)%size].incidentEdge
                 # Add a diagonal if helper(e_i+1) is a merge vertex
-                if vertexType[helper] == mergeVertex:
-                    self.__addDiagonal__(vertex, helper, edges)
+                if vertexType[eiPlus1.helper] == mergeVertex:
+                    self.__addDiagonal__(vertex, eiPlus1.helper, edges)
                 # Delete e_i+1 from searchtree
                 tree.remove(eiPlus1)
                 # Perform actions which are unique to a merge vertex
@@ -427,7 +491,7 @@ class Polygon:
                 self.__addDiagonal__(vertex, ej.helper, edges)
                 # Set vertex as new helper
                 ej.helper = vertex
-                ei = edges[vertex]
+                ei = dcelVertices[vertex].incidentEdge
                 # Add e_i to tree and set vertex as helper
                 ei.helper = vertex
                 tree.add(ei)
@@ -440,7 +504,7 @@ class Polygon:
                     # glVertex2f(v.x, v.y)
                     # glEnd()
                     # glPointSize(1)
-                    eiPlus1 = edges[(vertex+1)%size]
+                    eiPlus1 = dcelVertices[(vertex+1)%size].incidentEdge
                     helper = eiPlus1.helper
                     # Add a diagonal if helper(e_i+1) is a merge vertex
                     if vertexType[helper] == mergeVertex:
@@ -449,7 +513,7 @@ class Polygon:
                     # Delete e_i+1 from searchtree
                     tree.remove(eiPlus1)
                     # Add e_i to tree and set vertex as helper
-                    ei = edges[vertex]
+                    ei = dcelVertices[vertex].incidentEdge
                     ei.helper = vertex
                     tree.add(ei)
                 else:
@@ -517,8 +581,8 @@ class Polygon:
             # for t in m.triangles:
                 # t.draw(1., 1., .2)
             
-        for m in self.monotones:         
-            m.draw(1.0, 0.2, 0.2)
+        #    for m in self.monotones:         
+            #    m.draw(1.0, 0.2, 0.2)
             
         # self.monotones[0].draw()
         
