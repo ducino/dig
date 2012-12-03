@@ -11,20 +11,26 @@ class Polygon:
         self.vertices = []
         self.monotones = None
         self.triangles = None
+        self.debug = 0
     
     def addVertex(self, p):
         self.vertices.append(p)
         self.updateBoundingBox()
         
     def draw(self, r, g, b):
-        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
-        glEnable(GL_POLYGON_OFFSET_LINE);
-        glColor3d (r, g, b);
-        glPolygonOffset(-1.,-1.);
-        self.__privateDraw__()
+        if self.debug == 2:
+            return
+        if self.debug == 1:
+            glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
+            glEnable(GL_POLYGON_OFFSET_LINE);
+            glColor3d (r, g, b);
+            glPolygonOffset(-1.,-1.);
+            self.__privateDraw__()
+            return
         
         size = len(self.vertices)
-        print size
+
+        # print size
         if size <= 3:
             glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
             glEnable(GL_POLYGON_OFFSET_LINE);
@@ -32,16 +38,20 @@ class Polygon:
             glPolygonOffset(-1.,-1.);
             self.__privateDraw__()
             return
-            
+        
+        # print "ohn"
         if self.monotones:
             for m in self.monotones:
                 m.draw(r,g,b)
             return
-            
+        
+        # print "hmm"
         if self.triangles:
             for t in self.triangles:
+                # print "Triangle " + str(len(t.vertices))
                 t.draw(r,g,b)
             return
+        print "wtf"
         # glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
         # glColor3d (.9, .9, .9)
         # glColor3d (.1, .1, .1)
@@ -250,6 +260,7 @@ class Polygon:
             self.twin = None
             self.next = None
             self.prev = None
+            self.face = None
             self.helper = None
             self.visited = False
             
@@ -286,6 +297,33 @@ class Polygon:
         def __init__(self, v):
             self.v = v
             self.incidentEdge = None
+            
+    class DCELFace:
+        def __init__(self, edge):
+            self.edge = edge
+            
+    class DCELEdgeIterator:
+        def __init__(self, edge):
+            self.start = edge
+            self.current = edge
+            
+        def next(self):
+            self.current = self.current.next
+            if self.current == self.start:
+                return None
+            return self.current
+            
+    class DCELIncidentEdgeIterator:
+        def __init__(self, edge):
+            self.start = edge
+            self.current = edge
+            
+        def next(self):
+            self.current = self.current.next.twin
+            if self.current == self.start:
+                return None
+            return self.current
+            
 
     # Search tree, implemented initially as a flat array (Laziness)
     class Tree:
@@ -316,12 +354,48 @@ class Polygon:
         v2 = dcelVertices[vi2]
         
         # Replace the references of inbound and outbound edges for v1 and v2
-        incidentEdge1 = v1.incidentEdge        
-        nextEdge1 = incidentEdge1.next
+        # old code:
+        # incidentEdge1 = v1.incidentEdge      
+        # nextEdge1 = incidentEdge1.next
         
-        incidentEdge2 = v2.incidentEdge
-        nextEdge2 = incidentEdge2.next
+        # incidentEdge2 = v2.incidentEdge   
+        # nextEdge2 = incidentEdge2.next
         
+        # Find the common face for v1 and v2
+        face = None
+        startIncidentEdge1 = v1.incidentEdge
+        inc1 = startIncidentEdge1
+        it1 = Polygon.DCELIncidentEdgeIterator(inc1)
+        while inc1:
+            face1 = inc1.face
+            startIncidentEdge2 = v2.incidentEdge
+            inc2 = startIncidentEdge2
+            it2 = Polygon.DCELIncidentEdgeIterator(inc2)
+            while inc2:
+                if face1 == inc2.face and face1 != None:
+                    face = face1
+                    break
+                inc2 = it2.next()
+            inc1 = it1.next()
+        
+        incidentEdge1 = None
+        nextEdge1 = None
+        incidentEdge2 = None
+        nextEdge2 = None
+        
+        startEdge = face.edge
+        e = startEdge
+        it = Polygon.DCELEdgeIterator(e)
+        while e:
+            if e.origin == v1:
+                incidentEdge1 = e.prev
+                nextEdge1 = e
+            if e.origin == v2:
+                incidentEdge2 = e.prev
+                nextEdge2 = e
+            e = it.next()
+        
+        # Connect 2 new half edges
         diagonal1 = Polygon.DCELHalfEdge(v1)
         diagonal1.prev = incidentEdge1
         incidentEdge1.next = diagonal1
@@ -336,6 +410,23 @@ class Polygon:
 
         diagonal1.twin = diagonal2
         diagonal2.twin = diagonal1
+        
+        # Connect new faces
+        face1 = Polygon.DCELFace(diagonal1)
+        face2 = Polygon.DCELFace(diagonal2)
+        start1 = diagonal1
+        e1 = start1
+        it1 = Polygon.DCELEdgeIterator(e1)
+        while e1:
+            e1.face = face1
+            e1 = it1.next()
+        
+        start2 = diagonal2
+        e2 = start2
+        it2 = Polygon.DCELEdgeIterator(e2)
+        while e2:
+            e2.face = face2
+            e2 = it2.next()
 
     
     # Construct the Doubly connected edge list
@@ -386,7 +477,19 @@ class Polygon:
             
             twinEdge = currentEdge.twin
             twinEdge.prev = nextVertex.incidentEdge.twin
-            twinEdge.next = prevVertex.incidentEdge.twin         
+            twinEdge.next = prevVertex.incidentEdge.twin
+
+        # Connect the single face
+        startVertex = dcelVertices[0]
+        startEdge = startVertex.incidentEdge
+        face = Polygon.DCELFace(startEdge)
+        
+        e = startEdge
+        it = Polygon.DCELEdgeIterator(e)
+        while e:
+            e.face = face
+            e = it.next()
+        
                 
     # Sort the vertices of this polygon according to y coordinate
     def __ySortVertices__(self, sortedVertices):
@@ -405,6 +508,9 @@ class Polygon:
     
     @staticmethod
     def __constructPolygonsFromDCEL__(dcelVertices, polygons):
+        # Avoid double monotones
+        for vertex in dcelVertices:
+            vertex.incidentEdge.visited = True
         for vertex in dcelVertices:
             startEdge1 = vertex.incidentEdge
             e1 = startEdge1
@@ -455,6 +561,27 @@ class Polygon:
         # Construct doubly-connected edge list
         dcelVertices = []
         self.__constructDCEL__(dcelVertices)
+        
+        glColor3f(1., 1., 1.)
+        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
+        glEnable(GL_POLYGON_OFFSET_LINE)
+        self.__privateDraw__()
+        
+        # start.mark()
+        # e = dcelVertices[0].incidentEdge
+        # it = Polygon.DCELEdgeIterator(e)
+        # while e:
+            # e.mark()                     
+            # e = it.next()
+        # return
+            
+        # e = dcelVertices[0].incidentEdge
+        # it = Polygon.DCELIncidentEdgeIterator(e)
+        # while e:
+            # e.mark()                     
+            # e = it.next()            
+        # return
+        
         
         # Debug code for construct DCEL
         # c = int(time.clock())
@@ -569,15 +696,32 @@ class Polygon:
         self.monotones = []
         Polygon.__constructPolygonsFromDCEL__(dcelVertices, self.monotones)
         
-        # for polygon in self.monotones:
-            # polygon.draw(1., 1., .2)
+        # for m in self.monotones:
+            # if len(m.vertices) == len(self.vertices):
+                # self.monotones.remove(m)
+        
+        # print "Monotones: " + str(len(self.monotones))
+        if self.debug == 2:
+            c = int(time.clock()*2)%(len(self.monotones)+1)
+            print c
+            if c == len(self.monotones):
+                glColor3f(1., 1., .2)
+                self.__privateDraw__()
+                return
+            glColor3f(.2, .2, 1.)
+            self.monotones[c].__privateDraw__()
+            # for polygon in self.monotones:
+                # polygon.__privateDraw__()
+            return
                         
         for m in self.monotones:
             if len(m.vertices) == 3:
                 continue
             
-            monoDcelVertices = []
-            m.__constructDCEL__(monoDcelVertices)
+            m.triangles = []
+            
+            # monoDcelVertices = []
+            # m.__constructDCEL__(monoDcelVertices)
             
             monotoneSortedVertices = []
             m.__ySortVertices__(monotoneSortedVertices)
@@ -590,7 +734,13 @@ class Polygon:
                     poppedLast = stack.pop()
                     vStack = stack[-1]
                     while not Polygon.__interiorAngleGreaterThanPi__(m.vertices[vStack], m.vertices[poppedLast], m.vertices[monotoneSortedVertices[j]]):
-                        m.__addDiagonal__(vStack, monotoneSortedVertices[j], monoDcelVertices)
+                        # m.__addDiagonal__(vStack, monotoneSortedVertices[j], monoDcelVertices)
+                        # Create a triangle
+                        tri = Polygon()
+                        tri.addVertex(m.vertices[vStack])
+                        tri.addVertex(m.vertices[monotoneSortedVertices[j]])
+                        tri.addVertex(m.vertices[stack[-1]])
+                        m.triangles.append(tri)
                         poppedLast = stack.pop()
                         if len(stack) == 0:
                             break;
@@ -601,14 +751,27 @@ class Polygon:
                 else:
                     while len(stack) > 0:
                         vi = stack.pop()
-                        m.__addDiagonal__(vi, monotoneSortedVertices[j], monoDcelVertices)
+                        # m.__addDiagonal__(vi, monotoneSortedVertices[j], monoDcelVertices)
+                        # Create a triangle
+                        tri = Polygon()
+                        tri.addVertex(m.vertices[vi])
+                        tri.addVertex(m.vertices[monotoneSortedVertices[j]])
+                        tri.addVertex(m.vertices[monotoneSortedVertices[j-1]])
+                        m.triangles.append(tri)
                     stack.append(monotoneSortedVertices[j-1])
                     stack.append(monotoneSortedVertices[j])
+                    
+            if len(stack) == 3:
+                tri = Polygon()
+                tri.addVertex(m.vertices[stack.pop()])
+                tri.addVertex(m.vertices[stack.pop()])
+                tri.addVertex(m.vertices[stack.pop()])
+                m.triangles.append(tri)
 
-            m.triangles = []
-            Polygon.__constructPolygonsFromDCEL__(monoDcelVertices, m.triangles)
-            for t in m.triangles:
-                t.draw(1., .2, .2)
+            # m.triangles = []
+            # Polygon.__constructPolygonsFromDCEL__(monoDcelVertices, m.triangles)
+            # for t in m.triangles:
+                # t.draw(1., .2, .2)
             
         # for m in self.monotones:         
             # m.draw(1.0, 0.2, 0.2)
@@ -643,7 +806,8 @@ class Polygon:
     def midpointDisplacement(self, factor):
         seed = random.randint(0, 10000)
         if factor == 8:
-            seed = 8977
+            # seed = 8977
+            seed = 9539
         print factor
         print seed
         random.seed(seed)
