@@ -361,6 +361,15 @@ class Polygon:
                     # e.mark()
             # self.count = (self.count+1)%25
             return e
+        def draw(self):
+            print "hmpf"
+            for edge in self.edges:
+                glLineWidth(6)
+                glBegin(GL_LINES)
+                glVertex2f(edge.start().x, edge.start().y)
+                glVertex2f(edge.end().x, edge.end().y)
+                glEnd()
+                glLineWidth(1)
        
     # Add a diagonal to the DCEL of this polygon
     def __addDiagonal__(self, vi1, vi2, dcelVertices):
@@ -666,17 +675,7 @@ class Polygon:
         
         # Initialize the partition with the edges of the (possibly) not-monotone polygon
         tree = Polygon.Tree()
-        
-        #
-        # TEST CODE: Test tree
-        #
-        # for vertex in dcelVertices:
-            # tree.add(vertex.leavingEdge)
-        # for vertex in dcelVertices:
-            # tree.edgeLeftOf(vertex.v)
-        # return
-        # ########################
-        
+
         # Handle each vertex, from top to bottom the polygon
         # Handling each vertex depends on the type of the vertex
         for vertex in sortedVertices:
@@ -700,8 +699,8 @@ class Polygon:
                     ej = tree.edgeLeftOf(v)
                     if vertexType[ej.helper] == mergeVertex:
                         self.__addDiagonal__(vertex, ej.helper, dcelVertices)
-                        # Set vertex as new helper
-                        ej.helper = vertex
+                    # Set vertex as new helper
+                    ej.helper = vertex
             elif vertexType[vertex] == splitVertex:
                 # Find edge directly to the left of vertex
                 ej = tree.edgeLeftOf(v)
@@ -713,14 +712,9 @@ class Polygon:
                 ei.helper = vertex
                 tree.add(ei)
             elif vertexType[vertex] == regularVertex:
-                #If the interior of the polygon lies left of this vertex
-                if self.vertices[(vertex+1)%size].y > v.y and \
-                   self.vertices[vertex-1].y <= v.y:
-                    # glPointSize(20)
-                    # glBegin(GL_POINTS)
-                    # glVertex2f(v.x, v.y)
-                    # glEnd()
-                    # glPointSize(1)
+                #If the interior of the polygon lies right of this vertex
+                if self.vertices[(vertex+1)%size].y <= v.y and \
+                   self.vertices[vertex-1].y > v.y:
                     eiMinus1 = dcelVertices[vertex-1].leavingEdge
                     helper = eiMinus1.helper
                     # Add a diagonal if helper(e_i-1) is a merge vertex
@@ -729,15 +723,10 @@ class Polygon:
                     # Delete e_i-1 from searchtree
                     tree.remove(eiMinus1)
                     # Add e_i to tree and set vertex as helper
-                    ei = dcelVertices[vertex+1].leavingEdge
+                    ei = dcelVertices[vertex].leavingEdge
                     ei.helper = vertex
                     tree.add(ei)
                 else:
-                    # glPointSize(10)
-                    # glBegin(GL_POINTS)
-                    # glVertex2f(v.x, v.y)
-                    # glEnd()
-                    # glPointSize(1)
                     # Find edge directly to the left of vertex
                     ej = tree.edgeLeftOf(v)
                     if vertexType[ej.helper] == mergeVertex:
@@ -848,10 +837,11 @@ class Polygon:
     # perpendicular to the line segment, distance between -factor and +factor
     def midpointDisplacement(self, factor):
         seed = random.randint(0, 10000)
-        if factor == 8:
+        # if factor == 8:
             # seed = 8977
             # seed = 9539
-            seed = 1909
+            # seed = 1909
+            # seed = 5021
         print factor
         print seed
         random.seed(seed)
