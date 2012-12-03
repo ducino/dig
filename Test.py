@@ -75,9 +75,9 @@ class Actor:
 def createBoundingBoxPolygon(pMin, pMax):
     p = Polygon()
     p.addVertex(Vector(pMin.x, pMax.y))
-    p.addVertex(Vector(pMax.x, pMax.y))
-    p.addVertex(Vector(pMax.x, pMin.y))
     p.addVertex(Vector(pMin.x, pMin.y))
+    p.addVertex(Vector(pMax.x, pMin.y))
+    p.addVertex(Vector(pMax.x, pMax.y))
     return p
 
 
