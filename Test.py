@@ -1,11 +1,14 @@
 import pyglet
 import random
-from math import sqrt
 from pyglet.gl import *
 from pyglet.window import key
+from math import sqrt
+
 from Polygon import Polygon
 from Vector import Vector
+from Actor import Actor
 from BoundingBox import BoundingBox
+from QuadTree import QuadNode
 
 # TODO intersection of polygons
 # TODO triangulation
@@ -14,7 +17,7 @@ from BoundingBox import BoundingBox
 # TODO controls proper acceleration
 # TODO proper clipping
 
-window = pyglet.window.Window(width=800, height=600)
+window = pyglet.window.Window(width=1280, height=1024)
 #window.push_handlers(pyglet.window.event.WindowEventLogger())
 
 translateZ = -100
@@ -24,54 +27,7 @@ label = pyglet.text.Label('Midpoint displacement test',
     font_size=36,
     x=window.width//2, y=window.height//2,
     anchor_x='center', anchor_y='center')
-    
-def drawLineSegment(p1, p2):
-    glVertex2f(p1.x, p1.y)
-    glVertex2f(p2.x, p2.y)
-   
-class Actor:
-    def __init__(self):
-        self.speed = Vector(0, 0)
-        self.width = 5
-        self.height = 15
-        self.canJump = True
-        self.location = Vector(0, 11)
-        self.updateLocation(Vector(0, 10))
-    
-    def draw(self):
-        glBegin(GL_POLYGON)
-        glVertex2f(self.location.x-self.width/2, self.location.y-self.height/2)
-        glVertex2f(self.location.x+self.width/2, self.location.y-self.height/2)
-        glVertex2f(self.location.x+self.width/2, self.location.y+self.height/2)
-        glVertex2f(self.location.x-self.width/2, self.location.y+self.height/2)
-        glEnd()
-        
-    def accelerate(self, vector, dt):
-        maxSpeedX = 5
-        maxSpeedY = 20
-        self.speed.x = self.speed.x + vector.x*dt
-        if self.speed.x > maxSpeedX:
-            self.speed.x = maxSpeedX
-            
-        self.speed.y = self.speed.y + vector.y*dt
-        if self.speed.y > maxSpeedY:
-            self.speed.y = maxSpeedY
-        
-    def gravity(self, dt):
-        self.accelerate(Vector(0, -10), dt)
-        
-    def applySpeed(self, dt):
-        self.location.x = self.location.x + self.speed.x
-        self.location.y = self.location.y + self.speed.y
-        
-    def updateLocation(self, newLocation):
-        self.previousLocation = self.location
-        self.location = newLocation
-        self.bbox = BoundingBox(self.location.x-self.width/2, self.location.y-self.height/2,
-                                self.location.x+self.width/2, self.location.y+self.height/2)
-    
-     
-        
+
 def createBoundingBoxPolygon(pMin, pMax):
     p = Polygon()
     p.addVertex(Vector(pMin.x, pMax.y))
@@ -79,9 +35,8 @@ def createBoundingBoxPolygon(pMin, pMax):
     p.addVertex(Vector(pMax.x, pMin.y))
     p.addVertex(Vector(pMax.x, pMax.y))
     return p
-
-
-class Line:
+    
+class LineSegment:
     def __init__(self, x1, y1, x2, y2):
         self.x1 = x1
         self.y1 = y1
@@ -105,34 +60,8 @@ class Line:
         hy = (self.y1 + self.y2)/2
         return Line(hx, hy, hx - dy, hy + dx)        
 
-class Node:
-    def __init__(self):
-        self.partition = Vector(0, 1)
-        self.location = Vector(0, 0)
-        self.lines = []
-        #self.nodeLeft = Node()
-        #self.nodeRight = Node()
-        
-    def add(self, line):
-        self.lines.append(line)
-        
-    def draw(self):
-        glBegin(GL_LINES)
-        for line in self.lines:
-            drawLine(line)
-        glEnd()
-        d = 10
-        glBegin(GL_LINES)
-        glVertex2f(self.location.x, self.location.y)
-        glVertex2f(self.location.x+self.partition.x*d, self.location.y+self.partition.y*d)
-        glEnd()
-        glPointSize( 6.0 )
-        glBegin(GL_POINTS)
-        glVertex2f(self.location.x, self.location.y)
-        glEnd()
-
 actor = Actor()
-world = Node()
+world = QuadNode()
 
 polygon = createBoundingBoxPolygon(Vector(-100, -100), Vector(100, 0))
 polygon.midpointDisplacement(10)
@@ -140,24 +69,40 @@ polygon.midpointDisplacement(10)
 polygon.midpointDisplacement(8)
 polygon.midpointDisplacement(6)
 polygon.triangulate()
+world.add(polygon)
 
 polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
 polygon2.midpointDisplacement(8)
 polygon2.midpointDisplacement(6)  
 polygon2.triangulate()
 
+lastpoly = None
+for i in range(-5, 5):
+    poly = createBoundingBoxPolygon(Vector(-200*i, -200), Vector(-200*i+100+random.randrange(50, 150), -100))
+    poly.midpointDisplacement(10)
+    poly.midpointDisplacement(10)
+    poly.midpointDisplacement(8)
+    poly.midpointDisplacement(6)
+    poly.triangulate()
+    lastpoly = poly
+    world.add(poly)
+
+
+
 @window.event
 def on_draw():
     window.clear()
     glClear(GL_COLOR_BUFFER_BIT)
     glViewport(0, 0, window.width, window.height)
+
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
-    gluPerspective(65, window.width / float(window.height), .1, 1000000)
+    gluPerspective(65, window.width / float(window.height), .1, 10000)
 
     global actor
+    global world
     glTranslatef(-actor.location.x, -actor.location.y, translateZ)
-    line = Line(-window.width/2, 0, window.width/2, 0)
+    line = LineSegment(-window.width/2, 0, window.width/2, 0)
     #glEnable(GL_POLYGON_SMOOTH)
     #glBegin(GL_POLYGON)
     #drawLine(line)
@@ -170,10 +115,20 @@ def on_draw():
     actor.draw()
     #actor.bbox.draw()
     #world.draw()
+    
     polygon.draw()
-    label.draw()
-    polygon.bbox.draw()
-    polygon2.draw()
+    # label.draw()
+    # polygon.bbox.draw()
+    # polygon2.draw()
+    BoundingBox(-10, -10, 10, 10).draw()
+    world.add(actor)
+    world.drawCollision(actor)
+    world.remove(actor)
+    world.draw(actor.view(window))
+    
+    lastpoly.bbox.draw()
+    # global lastpoly
+    # world.drawCollision(lastpoly)
     
 def drawLine(line):
     glVertex2f(line.x1, line.y1)
@@ -223,9 +178,11 @@ def on_key_release(symbol, modifiers):
     
 def update(dt):
     # move the actor
-    a = 10
-    aStop = 20
-    a_jump = 5
+    a = 200
+    aStop = 500
+    a_jump = 100
+    
+    print dt
     
     global actor
     global polygon
@@ -233,42 +190,15 @@ def update(dt):
     global pressedRight
     global pressedJump
     
-    if pressedLeft:
-        if actor.speed.x > 0:
-            actor.accelerate(Vector(-aStop, 0), dt)
-        else:
-            actor.accelerate(Vector(-a, 0), dt)
-    elif pressedRight:
-        if actor.speed.x < 0:
-            actor.accelerate(Vector(aStop, 0), dt)
-        else:
-            actor.accelerate(Vector(a, 0), dt)
-    elif abs(actor.speed.x) < 2:
-        actor.speed.x = 0
-    elif actor.speed.x < 0:
-        actor.accelerate(Vector(aStop, 0), dt)
-    else: #actor.speed.x > 0
-        actor.accelerate(Vector(-aStop, 0), dt)
-                
-    if pressedJump and actor.canJump:
-        actor.canJump = False
-        actor.accelerate(Vector(0, a_jump), 1)
+    actor.update(dt, pressedRight, pressedLeft, pressedJump)
     
-    actor.gravity(dt)
-    
-    if actor.location.y < -500:
-        actor.speed.y = 0
-        actor.location = Vector(0, 0)
-     
-    actor.applySpeed(dt)
-    
-    collides, newLocation = polygon.collision(actor)
-
+    collides, offset = world.collision(actor)
+    newLocation = actor.location
     if collides:
+        newLocation = newLocation.add(offset)
+        # newLocation = offset
         actor.canJump = True
         actor.speed.y = 0
-    else:
-        newLocation = actor.location
         
     actor.updateLocation(newLocation)
     

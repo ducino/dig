@@ -1,10 +1,9 @@
+import sys
+import time
+import random
 from pyglet.gl import *
 from Vector import Vector
 from BoundingBox import BoundingBox
-import random
-from math import acos, floor
-import sys
-import time
 
 class Polygon:
     def __init__(self):
@@ -12,6 +11,7 @@ class Polygon:
         self.monotones = None
         self.triangles = None
         self.debug = 0
+        self.bbox = None
     
     def addVertex(self, p):
         self.vertices.append(p)
@@ -94,7 +94,8 @@ class Polygon:
             t, u = Polygon.__LineSegmentIntersection__(p, r, q, s)
             
             if t >= 0 and t < 1 and u >= 0 and u < 1:
-                return True, p.add(r.multiply(t)).add(r.multiply(0.5))
+                # return True, p.add(r.multiply(t)).add(r.multiply(0.5))
+                return True, r.multiply(t)#.add(Vector(0, -.001))
         return False, Vector(0,0)
     
     def __selfIntersects__(self):
@@ -740,8 +741,8 @@ class Polygon:
 
     def updateBoundingBox(self):
         size = len(self.vertices)
-        self.bbox = BoundingBox(0,0,0,0)
-        for vertex in range(size):
+        self.bbox = BoundingBox(self.vertices[0].x,self.vertices[0].y,self.vertices[0].x,self.vertices[0].y)
+        for vertex in range(1, size):
             self.bbox.add(self.vertices[vertex].x, self.vertices[vertex].y)
             
        
