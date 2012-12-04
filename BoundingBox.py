@@ -20,6 +20,9 @@ class BoundingBox:
             self.maxY = y
             
     def draw(self):
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glEnable(GL_POLYGON_OFFSET_LINE);
+        glPolygonOffset(-1.,-1.);
         glColor3ub(0x10, 0xA7, 0xE3)
         glBegin(GL_POLYGON)
         glVertex2f(self.minX, self.minY)

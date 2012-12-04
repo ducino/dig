@@ -133,15 +133,18 @@ class Node:
 
 actor = Actor()
 world = Node()
+
 polygon = createBoundingBoxPolygon(Vector(-100, -100), Vector(100, 0))
 polygon.midpointDisplacement(10)
 polygon.midpointDisplacement(10)
 polygon.midpointDisplacement(8)
 polygon.midpointDisplacement(6)
-#polygon.triangulate()
+polygon.triangulate()
+
 polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
 polygon2.midpointDisplacement(8)
 polygon2.midpointDisplacement(6)  
+polygon2.triangulate()
 
 @window.event
 def on_draw():
@@ -167,15 +170,10 @@ def on_draw():
     actor.draw()
     #actor.bbox.draw()
     #world.draw()
-    #polygon.draw()
+    polygon.draw()
     label.draw()
     polygon.bbox.draw()
-    #polygon2.draw()
-    #polygon.cut(polygon2)
-    #polygon.triangulate()
-   
-    polygon2.triangulate()
-    # polygon2.draw(1., 1., 1.)
+    polygon2.draw()
     
 def drawLine(line):
     glVertex2f(line.x1, line.y1)
@@ -207,6 +205,7 @@ def on_key_press(symbol, modifiers):
         polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
         polygon2.midpointDisplacement(8)
         polygon2.midpointDisplacement(6)
+        polygon2.triangulate()
     if symbol == key.Z:
         polygon2.debug = (polygon2.debug + 1)%4
         

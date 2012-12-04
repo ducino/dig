@@ -16,46 +16,38 @@ class Polygon:
     def addVertex(self, p):
         self.vertices.append(p)
         self.updateBoundingBox()
-        
-    def draw(self, r, g, b):
-        if self.debug == 2:
-            return
-        if self.debug == 1:
-            glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
-            glEnable(GL_POLYGON_OFFSET_LINE);
-            glColor3d (r, g, b);
-            glPolygonOffset(-1.,-1.);
-            self.__privateDraw__()
-            return
-        
-        size = len(self.vertices)
-
-        if size <= 3:
-            glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);
-            glEnable(GL_POLYGON_OFFSET_LINE);
-            glColor3d (r, g, b);
-            glPolygonOffset(-1.,-1.);
-            self.__privateDraw__()
-            return
     
+    #
+    # Draw this polygon
+    #
+    def draw(self):
+        self.__draw__(0)
+    
+    def __draw__(self, level):            
+        if len(self.vertices) <= 3:
+            glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
+            glColor3f (.1, .1, .1)
+            self.__drawPolygon__()
+            
+        if self.monotones and self.triangles:
+            print "this should not happen"
+            
         if self.monotones:
             for m in self.monotones:
-                m.draw(r,g,b)
-            return
-        
+                m.__draw__(level + 1)
+                
         if self.triangles:
             for t in self.triangles:
-                # print "Triangle " + str(len(t.vertices))
-                t.draw(r,g,b)
-            return
-        print "wtf"
-        # glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
-        # glColor3d (.9, .9, .9)
-        # glColor3d (.1, .1, .1)
-        # self.__privateDraw__()
+                t.__draw__(level + 1)
+         
+        if level == 0:
+            glColor3f(.9, .9, .9)
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            glEnable(GL_POLYGON_OFFSET_LINE);
+            glPolygonOffset(-1.,-1.);
+            self.__drawPolygon__()
 
-        
-    def __privateDraw__(self):
+    def __drawPolygon__(self):
         glBegin(GL_POLYGON)
         size = len(self.vertices)
         for vertex in range(size):
@@ -77,7 +69,11 @@ class Polygon:
         u = rhsR/rCrossS
         
         return t, u
-        
+    
+    #
+    # Check for collisions
+    # \return True|False, CollisionVector
+    #
     def collision(self, actor):
     
         if not actor.bbox.overlaps(self.bbox):
@@ -100,31 +96,7 @@ class Polygon:
             if t >= 0 and t < 1 and u >= 0 and u < 1:
                 return True, p.add(r.multiply(t)).add(r.multiply(0.5))
         return False, Vector(0,0)
-        
-    def solveSelfIntersections(self):
-        return self # TODO remove
-        # Try solving the self intersections by swapping vertices
-        # at the locations where self intersection occurs
-        p1 = self
-        p2 = self.__internalSolveSelfIntersections1__()
-        count = 0
-        while not p1 == p2 and count < 16:
-            p1 = p2
-            p2 = p1.__internalSolveSelfIntersections1__()
-            count = count +1
-        
-        # If the first attempt failed
-        # Start dropping parts (the smalles) of the self intersecting polygon
-        if not p1 == p2 and count == 16:
-            p1, p2 = self.__internalSolveSelfIntersections2__()
-            if len(p1.vertices) > len(p2.vertices):
-                return p1.solveSelfIntersections()
-            else:
-                return p2.solveSelfIntersections()
-        else:
-            p2.updateBoundingBox()
-            return p2
-
+    
     def __selfIntersects__(self):
         size = len(self.vertices)
         for vertex1 in range(size):
@@ -143,73 +115,8 @@ class Polygon:
                 if t >= 0 and t < 1 and u >= 0 and u < 1:
                     return True
         return False
-    
-    def __internalSolveSelfIntersections1__(self):
-        size = len(self.vertices)
-        for vertex1 in range(size):
-            p = self.vertices[vertex1]
-            pPlusR = self.vertices[(vertex1+1)%size]
-            r = pPlusR.subtract(p)
-            for vertex2 in range(vertex1, size):
-                if vertex1 == vertex2:
-                    continue
-                q = self.vertices[vertex2]
-                qPlusS = self.vertices[(vertex2+1)%size]
-                s = qPlusS.subtract(q)
-                
-                t, u = Polygon.__LineSegmentIntersection__(p, r, q, s)
-            
-                if t >= 0 and t < 1 and u >= 0 and u < 1:
-                    print "Intersect"
-                    # Swap vertices     
-                    newP = Polygon()                    
-                    newP.vertices = self.vertices[vertex1+1:vertex2]
-                    newP.vertices.reverse()
-                    for vertex in range(vertex2, vertex1+size+1):
-                        newP.vertices.append(self.vertices[vertex%size])
-                    return newP
-                    
-        return self
-        
-    def __internalSolveSelfIntersections2__(self):
-        size = len(self.vertices)
-        for vertex1 in range(size):
-            p = self.vertices[vertex1]
-            pPlusR = self.vertices[(vertex1+1)%size]
-            r = pPlusR.subtract(p)
-            for vertex2 in range(vertex1, size):
-                if vertex1 == vertex2:
-                    continue
-                q = self.vertices[vertex2]
-                qPlusS = self.vertices[(vertex2+1)%size]
-                s = qPlusS.subtract(q)
-                
-                t, u = Polygon.__LineSegmentIntersection__(p, r, q, s)
-            
-                if t >= 0 and t < 1 and u >= 0 and u < 1:
-                    # One solution: split polygon into 2
-                    newV = p.add(r.multiply(t))
-                    polygon1 = Polygon()
-                    polygon2 = Polygon()
-                    start = vertex1
-                    stop = vertex2
-                    if vertex1 > vertex2:
-                        start = vertex2
-                        stop = vertex1
-                    polygon1.addVertex(newV)
-                    for vertex in range(start+1, stop):
-                        polygon1.addVertex(self.vertices[vertex])
-                    
-                    polygon2.addVertex(newV)
-                    for vertex in range(stop, start+size):
-                        polygon2.addVertex(self.vertices[vertex%size])
-                        
-                    return polygon1, polygon2
-        return self, None
-                        
-                        
-               
-    
+
+    # TODO
     def cut(self, other):
         sizeSelf = len(self.vertices)
         sizeOther = len(other.vertices)
@@ -239,7 +146,9 @@ class Polygon:
                     glPointSize(6)
                     intersect.draw()
                     
+    #
     # Check if the given point is inside the polygon
+    #
     def inside(self, p):
         size = len(self.vertices)
         count = 0
@@ -258,7 +167,7 @@ class Polygon:
                 if p.x - (v1.x + (p.y - v1.y)/m) > 0:
                     count += 1
         return count%2 == 1
-        
+    
     @staticmethod
     def __interiorAngleGreaterThanPi__(v1, v2, v3):
         cross = v1.subtract(v2).cross(v3.subtract(v2))
@@ -289,15 +198,7 @@ class Polygon:
             if div == 0:
                 return v.x - self.start().x
             m = (self.start().y - self.end().y) / div
-            # glPointSize(10)
-            # glBegin(GL_POINTS)
-            # glVertex2f(v.x, v.y)
-            # glEnd()
-            # glPointSize(5)
-            # glBegin(GL_POINTS)
-            # glVertex2f(self.v1.x + (v.y - self.v1.y)/m, v.y)
-            # glEnd()
-            # self.mark()
+            
             return v.x - (self.start().x + (v.y - self.start().y)/m)
             
         def mark(self):
@@ -363,17 +264,8 @@ class Polygon:
                         if distToEdge > 0 and d > distToEdge:
                             d = distToEdge
                             e = edge
-            
-            # if self.count == int(time.clock()*2):
-                # glPointSize(20)
-                # glBegin(GL_POINTS)
-                # glVertex2f(v.x, v.y)
-                # glEnd()
-                # glPointSize(1)
-                # if e:
-                    # e.mark()
-            # self.count = (self.count+1)%25
             return e
+            
         def draw(self):
             print "hmpf"
             for edge in self.edges:
@@ -591,28 +483,27 @@ class Polygon:
             else:
                 vertexType.append(regularVertex)
 
-        glColor3f(1., 1., 1.)
-        glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
-        if False:
-            self.__privateDraw__()
-            for vertex in range(size):
-                v = self.vertices[vertex]
-                if vertexType[vertex] == startVertex:
-                    glPointSize(12)
-                elif vertexType[vertex] == endVertex:
-                    glPointSize(3)
-                elif vertexType[vertex] == splitVertex:
-                    glPointSize(6)
-                elif vertexType[vertex] == mergeVertex:
-                    glPointSize(9)
-                else:
-                    glPointSize(1)
+        # glColor3f(1., 1., 1.)
+        # glPolygonMode(GL_FRONT_AND_BACK,GL_LINE)
+        # if False:
+            # self.__privateDraw__()
+            # for vertex in range(size):
+                # v = self.vertices[vertex]
+                # if vertexType[vertex] == startVertex:
+                    # glPointSize(12)
+                # elif vertexType[vertex] == endVertex:
+                    # glPointSize(3)
+                # elif vertexType[vertex] == splitVertex:
+                    # glPointSize(6)
+                # elif vertexType[vertex] == mergeVertex:
+                    # glPointSize(9)
+                # else:
+                    # glPointSize(1)
                 
-                glColor3f(1., 2., 2.)
-                glBegin(GL_POINTS)
-                glVertex2f(v.x, v.y)
-                glEnd()
-        
+                # glColor3f(1., 2., 2.)
+                # glBegin(GL_POINTS)
+                # glVertex2f(v.x, v.y)
+                # glEnd()
         
         # Construct doubly-connected edge list
         dcelVertices = []
@@ -659,55 +550,11 @@ class Polygon:
         # tree.add(e1)
         # tree.edgeLeftOf(Vector(0, 0)).mark()
         # return
-        
-
-        # glEnable(GL_POLYGON_OFFSET_LINE)
-        # self.__privateDraw__()
-        # return
-        
-        # start.mark()
-        # e = dcelVertices[0].incidentEdge
-        # it = Polygon.DCELEdgeIterator(e)
-        # while e:
-            # e.mark()                     
-            # e = it.next()
-        # return
-            
-        # e = dcelVertices[0].incidentEdge
-        # it = Polygon.DCELIncidentEdgeIterator(e)
-        # while e:
-            # e.mark()                     
-            # e = it.next()            
-        # return
-        
-        
-        # Debug code for construct DCEL
-        # c = int(time.clock())
-        # vtest = dcelVertices[c%len(self.vertices)]
-        # glPointSize(20)
-        # glBegin(GL_POINTS)
-        # glVertex2f(vtest.v.x, vtest.v.y)
-        # glEnd()
-        # glPointSize(1)
-        # glColor3f(1., 1., 1.)
-        # vtest.incidentEdge.twin.mark()
-        # glColor3f(1., 1., .2)
-        # vtest.incidentEdge.twin.prev.mark()
-        # glColor3f(1., .2, .2)
-        # vtest.incidentEdge.twin.next.mark()
                 
         # Sort vertices top to bottom
         # Insertion sort
         sortedVertices = []        
         self.__ySortVertices__(sortedVertices)
-                        
-        # draw sorted vertices
-        # glColor3f(1., 1., 0.)
-        # glBegin(GL_POLYGON)
-        # for vertex in range(size):
-            # v = self.vertices[sortedVertices[vertex]]
-            # glVertex2f(v.x, v.y)
-        # glEnd()
         
         # Initialize the partition with the edges of the (possibly) not-monotone polygon
         tree = Polygon.Tree()
@@ -774,135 +621,53 @@ class Polygon:
                         self.__addDiagonal__(vertex, ej.helper, dcelVertices)
                     # Set vertex as new helper
                     ej.helper = vertex
-        
-        # for diag in diagonals:
-            # v1 = self.vertices[diag.v1]
-            # v2 = self.vertices[diag.v2]
-            # glColor3f(1., 1., .2)
-            # glBegin(GL_LINES)
-            # glVertex2f(v1.x, v1.y)
-            # glVertex2f(v2.x, v2.y)
-            # glEnd()
-        
+
         # Construct the monotones
         self.monotones = []
         Polygon.__constructPolygonsFromDCEL__(dcelVertices, self.monotones)
         
-        # for m in self.monotones:
-            # if len(m.vertices) == len(self.vertices):
-                # self.monotones.remove(m)
-        
         # print "Monotones: " + str(len(self.monotones))
-        if self.debug == 2:
-            c = int(time.clock()*2)%(len(self.monotones)+1)
-            if c == len(self.monotones):
-                glColor3f(1., 1., .2)
-                self.__privateDraw__()
-                return
-            glColor3f(.2, .2, 1.)
-            self.monotones[c].__privateDraw__()
+        # if self.debug == 2:
+            # c = int(time.clock()*2)%(len(self.monotones)+1)
+            # if c == len(self.monotones):
+                # glColor3f(1., 1., .2)
+                # self.__privateDraw__()
+                # return
+            # glColor3f(.2, .2, 1.)
+            # self.monotones[c].__privateDraw__()
             # for polygon in self.monotones:
                 # polygon.__privateDraw__()
-            return
+            # return
         
+        # for m in self.monotones:
+            # glColor3f(1., 1., 1.)
+            # m.__privateDraw__()
+
         for m in self.monotones:
-            glColor3f(1., 1., 1.)
-            m.__privateDraw__()
-            
-        # random.seed(int(time.clock()))
-        # p = Vector(random.randrange(-10, 10), random.randrange(-10, 10))
-        # glPointSize(30)
-        # glBegin(GL_POINTS)
-        # glVertex2f(p.x, p.y)
-        # glEnd()
-        # glPointSize(1)
-        # print self.inside(p)
-        # return
         
-        testCount = 0
-        for m in self.monotones:
-        # if True:
-            # m = self.monotones[1]
             if len(m.vertices) == 3:
-                if self.debug == 1 or self.debug == 3:
-                    m.draw(1., .6, .0)
+                # if self.debug == 1 or self.debug == 3:
+                    # m.draw(1., .6, .0)
                 continue
                        
             monoDcelVertices = []
             m.__constructDCEL__(monoDcelVertices)
-                        
-            # polys = []
-            # Polygon.__constructPolygonsFromDCEL__(monoDcelVertices, polys)
-            # for p in polys:
-                # glColor3f(.2, 1., .2);
-                # p.__privateDraw__()
-            # return
-                        
+
             monotoneSortedVertices = []
             m.__ySortVertices__(monotoneSortedVertices)
           
             stack = []
             stack.append(monotoneSortedVertices[0])
             stack.append(monotoneSortedVertices[1])
-            
 
-            
             for j in range(2, len(monotoneSortedVertices)-1):
             
                 if m.__onSameEdge__(stack[-1], monotoneSortedVertices[j]):
-                    # if testCount == int(time.clock()%12):
-                        # print "======"
-                        # glColor3f(1., .2, 1.)
-                        # glBegin(GL_LINES)
-                        # glVertex2f(m.vertices[monotoneSortedVertices[j]].x, m.vertices[monotoneSortedVertices[j]].y)
-                        # glVertex2f(m.vertices[stack[-1]].x, m.vertices[stack[-1]].y)
-                        # glEnd()
-                    # testCount = testCount+1
-                    # if testCount == int(time.clock()%12):
-                        # glPointSize(20)
-                        # for v in stack:
-                            # m.vertices[v].draw()
-                        # return
-                        # glPointSize(1)
-                    # testCount = testCount+1
                 
                     poppedLast = stack.pop()
                     vStack = stack[-1]
                     
-                    # if testCount == int(time.clock()%12):
-                        # glColor3f(1., .2, 1.)
-                        # glBegin(GL_LINES)
-                        # glVertex2f(m.vertices[monotoneSortedVertices[j]].x, m.vertices[monotoneSortedVertices[j]].y)
-                        # glVertex2f(m.vertices[vStack].x, m.vertices[vStack].y)
-                        # glEnd()
-                    # testCount = testCount+1
                     while m.__canAddDiagonal__(vStack, monotoneSortedVertices[j]):
-                        # polys = []
-                        # Polygon.__constructPolygonsFromDCEL__(monoDcelVertices, polys)
-                        # for p in polys:
-                            # glColor3f(.2, 1., .2);
-                            # p.__privateDraw__()
-                        # return
-                        
-                        # if testCount == int(time.clock()%12):
-                            # glColor3f(1., .2, 1.)
-                            # glBegin(GL_LINES)
-                            # glVertex2f(m.vertices[monotoneSortedVertices[j]].x, m.vertices[monotoneSortedVertices[j]].y)
-                            # glVertex2f(m.vertices[vStack].x, m.vertices[vStack].y)
-                            # glEnd()
-                        
-                        # if testCount == 1:
-                            # glPointSize(20)
-                            # glBegin(GL_POINTS)
-                            # glVertex2f(m.vertices[poppedLast].x, m.vertices[poppedLast].y)
-                            # glVertex2f(m.vertices[monotoneSortedVertices[j]].x, m.vertices[monotoneSortedVertices[j]].y)
-                            # glVertex2f(m.vertices[vStack].x, m.vertices[vStack].y)
-                            # glEnd()
-                            # glPointSize(1)
-                            # print "roar"
-                            # return
-                        # testCount = testCount+1
-                        
                         m.__addDiagonal__(vStack, monotoneSortedVertices[j], monoDcelVertices)
                         poppedLast = stack.pop()
                         if len(stack) == 0:
@@ -912,31 +677,8 @@ class Polygon:
                     stack.append(poppedLast)
                     stack.append(monotoneSortedVertices[j])
                 else:
-                    # if testCount == int(time.clock()%12):
-                        # print "======"
-                        # glColor3f(1., .2, 1.)
-                        # glBegin(GL_LINES)
-                        # glVertex2f(m.vertices[monotoneSortedVertices[j]].x, m.vertices[monotoneSortedVertices[j]].y)
-                        # glVertex2f(m.vertices[stack[-1]].x, m.vertices[stack[-1]].y)
-                        # glEnd()
-                    # testCount = testCount+1
                     while len(stack) > 0:
                         vi = stack.pop()
-                        # glPointSize(20)
-                        # glBegin(GL_POINTS)
-                        # glVertex2f(m.vertices[vi].x, m.vertices[vi].y)
-                        # glVertex2f(m.vertices[monotoneSortedVertices[j]].x, m.vertices[monotoneSortedVertices[j]].y)
-                        # glEnd()
-                        # glPointSize(1)
-                        # return
-
-                        # if testCount == int(time.clock()%12):
-                            # glColor3f(1., .2, 1.)
-                            # glBegin(GL_LINES)
-                            # glVertex2f(m.vertices[monotoneSortedVertices[j]].x, m.vertices[monotoneSortedVertices[j]].y)
-                            # glVertex2f(m.vertices[vi].x, m.vertices[vi].y)
-                            # glEnd()
-                        # testCount = testCount+1
                         if len(stack) > 0:
                             m.__addDiagonal__(vi, monotoneSortedVertices[j], monoDcelVertices)
                     stack.append(monotoneSortedVertices[j-1])
@@ -946,35 +688,16 @@ class Polygon:
             while len(stack) > 1:
                 m.__addDiagonal__(stack[-1], monotoneSortedVertices[-1], monoDcelVertices)
                 stack.pop()
-                
-            # if len(stack) == 3:
-                # tri = Polygon()
-                # tri.addVertex(m.vertices[stack.pop()])
-                # tri.addVertex(m.vertices[stack.pop()])
-                # tri.addVertex(m.vertices[stack.pop()])
-                # m.triangles.append(tri)
 
             m.triangles = []
             Polygon.__constructPolygonsFromDCEL__(monoDcelVertices, m.triangles)
-            if self.debug == 1:
-                m.triangles[int(time.clock()*2)%len(m.triangles)].draw(1., .2, .2)
-            if self.debug == 3:
-                for t in m.triangles:
-                    t.draw(1., .2, .2)
             
-        # for m in self.monotones:   
-            # if len(m.vertices) == 3:
-                # m.draw(1., .2, .2)
-        
-        # c = int(time.clock()/2)%(len(self.monotones))
-        # m = self.monotones[c]
-        # if len(m.vertices) == 3:
-            # m.__privateDraw__()
-        # else:   
-            # c2 = int(time.clock()*15)%(len(m.triangles))
-            # m.triangles[c2].__privateDraw__()
-    
-    
+            # if self.debug == 1:
+                # m.triangles[int(time.clock()*2)%len(m.triangles)].draw(1., .2, .2)
+            # if self.debug == 3:
+                # for t in m.triangles:
+                    # t.draw(1., .2, .2)
+
     # check if two vertices are on the same edge, given their indices
     def __onSameEdge__(self, i1, i2):
         size = len(self.vertices)
