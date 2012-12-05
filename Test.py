@@ -1,5 +1,6 @@
 import pyglet
 import random
+import time
 from pyglet.gl import *
 from pyglet.window import key
 from math import sqrt
@@ -22,10 +23,10 @@ window = pyglet.window.Window(width=1280, height=1024)
 
 translateZ = -100
 
-label = pyglet.text.Label('Midpoint displacement test',
+label = pyglet.text.Label('esdf to move, space to jump',
     font_name='Times New Roman',
-    font_size=36,
-    x=window.width//2, y=window.height//2,
+    font_size=8,
+    x=0, y=50,
     anchor_x='center', anchor_y='center')
 
 def createBoundingBoxPolygon(pMin, pMax):
@@ -60,6 +61,7 @@ class LineSegment:
         hy = (self.y1 + self.y2)/2
         return Line(hx, hy, hx - dy, hy + dx)        
 
+debug = 0
 actor = Actor()
 world = QuadNode()
 
@@ -76,7 +78,6 @@ polygon2.midpointDisplacement(8)
 polygon2.midpointDisplacement(6)  
 polygon2.triangulate()
 
-lastpoly = None
 for i in range(-5, 5):
     poly = createBoundingBoxPolygon(Vector(-200*i, -200), Vector(-200*i+100+random.randrange(50, 150), -100))
     poly.midpointDisplacement(10)
@@ -84,7 +85,6 @@ for i in range(-5, 5):
     poly.midpointDisplacement(8)
     poly.midpointDisplacement(6)
     poly.triangulate()
-    lastpoly = poly
     world.add(poly)
 
 
@@ -92,8 +92,11 @@ for i in range(-5, 5):
 @window.event
 def on_draw():
     window.clear()
+    
     glClear(GL_COLOR_BUFFER_BIT)
     glViewport(0, 0, window.width, window.height)
+    
+    label.draw()
 
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
@@ -117,18 +120,30 @@ def on_draw():
     #world.draw()
     
     polygon.draw()
-    # label.draw()
     # polygon.bbox.draw()
     # polygon2.draw()
-    BoundingBox(-10, -10, 10, 10).draw()
+    
     world.add(actor)
     world.drawCollision(actor)
     world.remove(actor)
+    
     world.draw(actor.view(window))
     
-    lastpoly.bbox.draw()
-    # global lastpoly
-    # world.drawCollision(lastpoly)
+    random.seed(int(time.clock()))
+    p1 = Polygon()
+    p1.addVertex(Vector(-10+random.randrange(-5, 5), 10+random.randrange(-5, 5)))
+    p1.addVertex(Vector(random.randrange(-5, 5), 20+random.randrange(-5, 5)))
+    p1.addVertex(Vector(10+random.randrange(-5, 5), 10+random.randrange(-5, 5)))
+    p1.draw()
+    
+    p2 = Polygon()
+    p2.addVertex(Vector(-8+random.randrange(-5, 5), 8+random.randrange(-5, 5)))
+    p2.addVertex(Vector(random.randrange(-5, 5), 16+random.randrange(-5, 5)))
+    p2.addVertex(Vector(8+random.randrange(-5, 5), 8+random.randrange(-5, 5)))
+    p2.draw()
+    
+    collides, vector = p1.collision(p2)
+    print collides
     
 def drawLine(line):
     glVertex2f(line.x1, line.y1)
@@ -150,6 +165,7 @@ def on_key_press(symbol, modifiers):
     global pressedRight
     global pressedJump
     global polygon2
+    global debug
     if symbol == key.LEFT:
         pressedLeft = True
     if symbol == key.RIGHT:
@@ -162,7 +178,7 @@ def on_key_press(symbol, modifiers):
         polygon2.midpointDisplacement(6)
         polygon2.triangulate()
     if symbol == key.Z:
-        polygon2.debug = (polygon2.debug + 1)%4
+        debug = (debug + 1)%4
         
 @window.event
 def on_key_release(symbol, modifiers):
@@ -177,30 +193,24 @@ def on_key_release(symbol, modifiers):
         pressedJump = False
     
 def update(dt):
-    # move the actor
-    a = 200
-    aStop = 500
-    a_jump = 100
-    
-    print dt
+    # print dt
     
     global actor
-    global polygon
     global pressedLeft
     global pressedRight
     global pressedJump
     
-    actor.update(dt, pressedRight, pressedLeft, pressedJump)
+    # actor.update(dt, pressedRight, pressedLeft, pressedJump)
     
-    collides, offset = world.collision(actor)
-    newLocation = actor.location
-    if collides:
-        newLocation = newLocation.add(offset)
-        # newLocation = offset
-        actor.canJump = True
-        actor.speed.y = 0
+    # collides, offset = world.collision(actor)
+    # newLocation = actor.location
+    # if collides:
+        # newLocation = newLocation.add(offset)
+        # # newLocation = offset
+        # actor.canJump = True
+        # actor.speed.y = 0
         
-    actor.updateLocation(newLocation)
+    # actor.updateLocation(newLocation)
     
     
 pyglet.clock.schedule_interval(update, 0.025)

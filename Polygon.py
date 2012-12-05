@@ -2,6 +2,7 @@ import sys
 import time
 import random
 from pyglet.gl import *
+from math import sqrt
 from Vector import Vector
 from BoundingBox import BoundingBox
 
@@ -10,7 +11,6 @@ class Polygon:
         self.vertices = []
         self.monotones = None
         self.triangles = None
-        self.debug = 0
         self.bbox = None
     
     def addVertex(self, p):
@@ -74,7 +74,7 @@ class Polygon:
     # Check for collisions
     # \return True|False, CollisionVector
     #
-    def collision(self, actor):
+    def collisionActor(self, actor):
     
         if not actor.bbox.overlaps(self.bbox):
             return False, Vector(0,0)
@@ -97,6 +97,86 @@ class Polygon:
                 # return True, p.add(r.multiply(t)).add(r.multiply(0.5))
                 return True, r.multiply(t)#.add(Vector(0, -.001))
         return False, Vector(0,0)
+        
+    #
+    # Check if this polygon collides with another polygon
+    # \return True|False, CollisionVector
+    #
+    def collision(self, other):
+        minAxis = None
+        minDist = sys.float_info.max
+        
+        collides, minAxis = self.__privateCollision__(other, minAxis, minDist)
+        if not collides:
+            return False, None
+        
+        return other.__privateCollision__(self, minAxis, minDist)
+        
+    # Internal collision method
+    def __privateCollision__(self, other, minAxis, minDist):
+        size = len(self.vertices)
+        for i in range(size):
+            v1 = self.vertices[i]
+            v2 = self.vertices[(i+1)%size]
+            
+            perp = Polygon.__perpendicularVector__(self, v1, v2)
+            
+            minSelf = maxSelf = minOther = maxOther = None
+            
+            minSelf, maxSelf = self.__projectOnAxis__(perp)
+            minOther, maxOther = other.__projectOnAxis__(perp)
+            
+            dist = Polygon.__getIntervalDistance__(minSelf, maxSelf, minOther, maxOther)
+            
+            if dist > 0.:
+                return False, None
+            elif abs(dist) < minDist:
+                minDist = abs(dist)
+                minAxis = perp
+        return True, minAxis
+            
+            
+    #
+    # Project all vertices of this polygon onto an axis
+    # Get the min and max values
+    #
+    def __projectOnAxis__(self, axis):
+        min = axis.dot(self.vertices[0])
+        max = axis.dot(self.vertices[0])
+        
+        for i in range(1, len(self.vertices)):
+            product = axis.dot(self.vertices[i])
+            
+            if product < min:
+                min = product
+            
+            if product > max:
+                max = product
+                
+        return min, max
+
+    #
+    # Get the distance beween two 1-dimensional intervals
+    #
+    @staticmethod
+    def __getIntervalDistance__(min1, max1, min2, max2):
+        if min1 < min2:
+            return min2 - max1
+        else:
+            return min1 - max2
+            
+    #
+    # Get the perpendicular vector on a line segment defined by 2 poins
+    #
+    @staticmethod
+    def __perpendicularVector__(self, v1, v2):
+        dy = (v1.y - v2.y)
+        dx = (v1.x - v2.x)
+        d = sqrt(dy*dy + dx*dx)
+        if d == 0:
+            return Vector(1, 0)
+        return Vector(-dy / d, dx / d)
+            
     
     def __selfIntersects__(self):
         size = len(self.vertices)

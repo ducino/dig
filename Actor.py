@@ -29,7 +29,7 @@ class Actor:
                 self.accelerate(Vector(self.accStop, 0), dt)
             else:
                 self.accelerate(Vector(self.accX , 0), dt)
-        elif abs(self.speed.x) < 5:
+        elif abs(self.speed.x) < 10:
             self.speed.x = 0
         elif self.speed.x < 0:
             self.accelerate(Vector(self.accStop, 0), dt)
