@@ -1,7 +1,9 @@
 from pyglet.gl import *
+from math import copysign
 from Vector import Vector
 from BoundingBox import BoundingBox
-from math import copysign
+from Polygon import Polygon
+from Controls import Controls
 
 class Actor:
     def __init__(self):
@@ -18,13 +20,15 @@ class Actor:
         self.accStop = 500
         self.accJump = 50
         
-    def update(self, dt, pressedRight, pressedLeft, pressedJump):
-        if pressedLeft:
+        self.controls = Controls()
+        
+    def update(self, dt):
+        if self.controls.pressedLeft:
             if self.speed.x > 0:
                 self.accelerate(Vector(-self.accStop, 0), dt)
             else:
                 self.accelerate(Vector(-self.accX, 0), dt)
-        elif pressedRight:
+        elif self.controls.pressedRight:
             if self.speed.x < 0:
                 self.accelerate(Vector(self.accStop, 0), dt)
             else:
@@ -36,17 +40,25 @@ class Actor:
         else: #self.speed.x > 0
             self.accelerate(Vector(-self.accStop, 0), dt)
                     
-        if pressedJump and self.canJump:
+        if self.controls.pressedJump and self.canJump:
             self.canJump = False
             self.accelerate(Vector(0, self.accJump), 1)
         
-        self.gravity(dt)
+        #TODO self.gravity(dt)
         
         if self.location.y < -700:
             self.speed.y = 0
             self.location = Vector(0, 0)
          
         self.applySpeed(dt)
+        
+        # TEST CODE
+        if self.controls.pressedUp:
+            self.updateLocation(self.location.add(Vector(0, 1)))
+        if self.controls.pressedDown:
+            self.updateLocation(self.location.add(Vector(0, -1)))
+        
+        self.updateLocation(self.location)
     
     def draw(self):
         glBegin(GL_POLYGON)
@@ -77,6 +89,9 @@ class Actor:
         self.location = newLocation
         self.bbox = BoundingBox(self.location.x-self.width/2, self.location.y-self.height/2,
                                 self.location.x+self.width/2, self.location.y+self.height/2)
+        self.polygon = Polygon.createBoundingBoxPolygon(Vector(self.location.x-self.width/2, self.location.y-self.height/2),
+                                                Vector(self.location.x+self.width/2, self.location.y+self.height/2))
+        self.polygon.convex = True        
     
     #
     # Get the view bounding box                         

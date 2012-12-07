@@ -1,5 +1,7 @@
 import sys
+from pyglet.gl import *
 from BoundingBox import BoundingBox
+from Vector import Vector
 
 class QuadNode:
     def __init__(self, depth=0, bbox=None):
@@ -98,14 +100,39 @@ class QuadNode:
         
         max = 0
         result = None
-        for offset in offsets:
+        # for offset in offsets:
+            # if offset.length() > max:
+                # result = offset
+                # max = offset.length()
+        
+        obj = None
+        for i in range(len(offsets)):
+            offset = offsets[i]
             if offset.length() > max:
+                obj = objects[i]
                 result = offset
                 max = offset.length()
                 
+        #obj.draw()
+                
+        p = Vector( (object.bbox.minX+object.bbox.maxX)/2, object.bbox.minY)
+        t = p.add(result)
+        glPointSize(10)
+        glBegin(GL_POINTS)
+        glVertex2f(p.x, p.y)
+        glEnd()
+        glPointSize(1)
+        
+        glLineWidth(10)
+        glBegin(GL_LINES)
+        glVertex2f(p.x, p.y)
+        glVertex2f(t.x, t.y)
+        glEnd()
+        glLineWidth(1)
+                
         return True, result
             
-     
+    
     def __collision__(self, object, offsets, objects):
     
         if self.depth == 8:
@@ -127,6 +154,7 @@ class QuadNode:
         
         if self.nw and self.nw.bbox.overlaps(object.bbox):
             self.nw.__collision__(object, offsets, objects)
+            
             
     def draw(self, view):
         drawn = []

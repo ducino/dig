@@ -6,16 +6,89 @@ from math import sqrt
 from Vector import Vector
 from BoundingBox import BoundingBox
 
+class CollisionInfo:
+    def __init__(self, bbox):
+        # The projection onto the vertical and horizontal axis
+        self.horizontalMin = sys.float_info.max
+        self.horizontalMax = -(sys.float_info.max-1)
+        self.verticalMin = sys.float_info.max
+        self.verticalMax = -(sys.float_info.max-1)
+        
+        self.horizontalAxis = Vector(1, 0)
+        self.verticalAxis = Vector(0, 1)
+        
+        # The bounding box of the actor
+        self.bbox = bbox
+    
+    #
+    # Add a horizontal projection and check for min and max values
+    #    
+    def addHorizontalProjection(self, projection):
+        if projection < self.horizontalMin:
+            self.horizontalMin = projection
+            
+        if projection > self.horizontalMax:
+            self.horizontalMax = projection
+    
+    #
+    # Add a vertical projection and check for min and max values
+    #
+    def addVerticalProjection(self, projection):
+        if projection < self.verticalMin:
+            self.verticalMin = projection
+            
+        if projection > self.verticalMax:
+            self.verticalMax = projection
+            
+    #
+    # Check if there was a collision given the projections
+    #
+    def collisionDetected(self):
+        dist = CollisionInfo.__getIntervalDistance__(self.horizontalMin, self.horizontalMax, self.bbox.minY, self.bbox.maxY)
+        if dist > 0:
+            return False
+        
+        dist = CollisionInfo.__getIntervalDistance__(self.verticalMin, self.verticalMax, self.bbox.minX, self.bbox.maxX)
+        if dist > 0:
+            return False
+            
+        return True
+        
+    #
+    # Merge two collision info objects
+    #
+    def add(self, other):
+        if self.horizonalMin > other.horizontalMin:
+            self.horizontalMin = other.horizontalMin
+         
+        if self.horizonalMax < other.horizontalMax:
+            self.horizontalMax = other.horizontalMax
+            
+        if self.verticalMin > other.verticalMin:
+            self.verticalMin = other.verticalMin
+         
+        if self.verticalMax < other.verticalMax:
+            self.verticalMax = other.verticalMax
+            
+
 class Polygon:
     def __init__(self):
         self.vertices = []
         self.monotones = None
         self.triangles = None
         self.bbox = None
+        
+        # If this is False, this does not mean it is no convex, but if it is True, it is!
+        self.convex = False
     
     def addVertex(self, p):
         self.vertices.append(p)
         self.updateBoundingBox()
+        
+        if len(self.vertices) == 3:
+            self.convex = True
+        else:
+            self.convex = False
     
     #
     # Draw this polygon
@@ -23,14 +96,21 @@ class Polygon:
     def draw(self):
         self.__draw__(0)
     
-    def __draw__(self, level):            
-        if len(self.vertices) <= 3:
+    def __draw__(self, level):
+        if len(self.vertices) < 3:
+            raise ValueError("This ain't no polygon! A duogon, at best!")
+            
+        if len(self.vertices) == 3:
             glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
             glColor3f (.1, .1, .1)
-            self.__drawPolygon__()
+            glBegin(GL_TRIANGLES)
+            glVertex2f(self.vertices[0].x, self.vertices[0].y)
+            glVertex2f(self.vertices[1].x, self.vertices[1].y)
+            glVertex2f(self.vertices[2].x, self.vertices[2].y)
+            glEnd()
             
         if self.monotones and self.triangles:
-            print "this should not happen"
+            raise ValueError("A polygon containing both monotones and triangles? Something went wrong")
             
         if self.monotones:
             for m in self.monotones:
@@ -97,23 +177,69 @@ class Polygon:
                 # return True, p.add(r.multiply(t)).add(r.multiply(0.5))
                 return True, r.multiply(t)#.add(Vector(0, -.001))
         return False, Vector(0,0)
-        
+              
     #
     # Check if this polygon collides with another polygon
     # \return True|False, CollisionVector
     #
-    def collision(self, other):
-        minAxis = None
-        minDist = sys.float_info.max
+    def collision(self, other):        
+        collides, axis, dist = self.__privateCollision__(other)
         
-        collides, minAxis = self.__privateCollision__(other, minAxis, minDist)
-        if not collides:
-            return False, None
+        if collides:
+            return True, axis.multiply(dist)
         
-        return other.__privateCollision__(self, minAxis, minDist)
-        
+        return False, None
+            
+    def __privateCollision__(self, other):
+        if not self.bbox.overlaps(other.bbox):
+            return False, None, None
+            
+        if self.convex:
+            minAxis = None
+            minDist = sys.float_info.max
+            collides, minAxis, minDist = self.__privateCollisionConvex__(other, minAxis, minDist)
+            if not collides:
+                return False, minAxis, minDist
+                
+            return other.__privateCollisionConvex__(self, minAxis, minDist)
+            
+        if self.monotones:
+            collides = False
+            newCollides = False
+            newAxis = None
+            newDist = None
+            axis = None
+            dist = sys.float_info.min
+            for m in self.monotones:
+                newCollides, newAxis, newDist = m.__privateCollision__(other)
+                if newCollides:
+                    collides = True
+                    if newDist > dist:
+                        dist = newDist
+                        axis = newAxis
+                        
+            return collides, axis, dist        
+            
+        if self.triangles:
+            collides = False
+            newCollides = False
+            newAxis = None
+            newDist = None
+            axis = None
+            dist = sys.float_info.min
+            for t in self.triangles:
+                newCollides, newAxis, newDist = t.__privateCollision__(other)
+                if newCollides:
+                    collides = True
+                    if newDist > dist:
+                        dist = newDist
+                        axis = newAxis
+                        
+            return collides, axis, dist    
+
+            
     # Internal collision method
-    def __privateCollision__(self, other, minAxis, minDist):
+    def __privateCollisionConvex__(self, other, minAxis, minDist):
         size = len(self.vertices)
         for i in range(size):
             v1 = self.vertices[i]
@@ -129,11 +255,11 @@ class Polygon:
             dist = Polygon.__getIntervalDistance__(minSelf, maxSelf, minOther, maxOther)
             
             if dist > 0.:
-                return False, None
+                return False, minAxis, minDist
             elif abs(dist) < minDist:
                 minDist = abs(dist)
                 minAxis = perp
-        return True, minAxis
+        return True, minAxis, minDist
             
             
     #
@@ -141,8 +267,7 @@ class Polygon:
     # Get the min and max values
     #
     def __projectOnAxis__(self, axis):
-        min = axis.dot(self.vertices[0])
-        max = axis.dot(self.vertices[0])
+        min = max = axis.dot(self.vertices[0])
         
         for i in range(1, len(self.vertices)):
             product = axis.dot(self.vertices[i])
@@ -154,7 +279,7 @@ class Polygon:
                 max = product
                 
         return min, max
-
+    
     #
     # Get the distance beween two 1-dimensional intervals
     #
@@ -824,5 +949,14 @@ class Polygon:
         self.bbox = BoundingBox(self.vertices[0].x,self.vertices[0].y,self.vertices[0].x,self.vertices[0].y)
         for vertex in range(1, size):
             self.bbox.add(self.vertices[vertex].x, self.vertices[vertex].y)
+    
+    @staticmethod
+    def createBoundingBoxPolygon(pMin, pMax):
+        p = Polygon()
+        p.addVertex(Vector(pMin.x, pMax.y))
+        p.addVertex(Vector(pMin.x, pMin.y))
+        p.addVertex(Vector(pMax.x, pMin.y))
+        p.addVertex(Vector(pMax.x, pMax.y))
+        return p
             
        

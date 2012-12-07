@@ -28,14 +28,6 @@ label = pyglet.text.Label('esdf to move, space to jump',
     font_size=8,
     x=0, y=50,
     anchor_x='center', anchor_y='center')
-
-def createBoundingBoxPolygon(pMin, pMax):
-    p = Polygon()
-    p.addVertex(Vector(pMin.x, pMax.y))
-    p.addVertex(Vector(pMin.x, pMin.y))
-    p.addVertex(Vector(pMax.x, pMin.y))
-    p.addVertex(Vector(pMax.x, pMax.y))
-    return p
     
 class LineSegment:
     def __init__(self, x1, y1, x2, y2):
@@ -65,7 +57,7 @@ debug = 0
 actor = Actor()
 world = QuadNode()
 
-polygon = createBoundingBoxPolygon(Vector(-100, -100), Vector(100, 0))
+polygon = Polygon.createBoundingBoxPolygon(Vector(-100, -100), Vector(100, 0))
 polygon.midpointDisplacement(10)
 polygon.midpointDisplacement(10)
 polygon.midpointDisplacement(8)
@@ -73,13 +65,13 @@ polygon.midpointDisplacement(6)
 polygon.triangulate()
 world.add(polygon)
 
-polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
+polygon2 = Polygon.createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
 polygon2.midpointDisplacement(8)
 polygon2.midpointDisplacement(6)  
 polygon2.triangulate()
 
 for i in range(-5, 5):
-    poly = createBoundingBoxPolygon(Vector(-200*i, -200), Vector(-200*i+100+random.randrange(50, 150), -100))
+    poly = Polygon.createBoundingBoxPolygon(Vector(-200*i, -200), Vector(-200*i+100+random.randrange(50, 150), -100))
     poly.midpointDisplacement(10)
     poly.midpointDisplacement(10)
     poly.midpointDisplacement(8)
@@ -123,12 +115,14 @@ def on_draw():
     # polygon.bbox.draw()
     # polygon2.draw()
     
+    # Quad Tree TEST CODE
     world.add(actor)
     world.drawCollision(actor)
     world.remove(actor)
     
     world.draw(actor.view(window))
     
+    # TEST CODE
     random.seed(int(time.clock()))
     p1 = Polygon()
     p1.addVertex(Vector(-10+random.randrange(-5, 5), 10+random.randrange(-5, 5)))
@@ -142,8 +136,14 @@ def on_draw():
     p2.addVertex(Vector(8+random.randrange(-5, 5), 8+random.randrange(-5, 5)))
     p2.draw()
     
-    collides, vector = p1.collision(p2)
-    print collides
+    collides, offset = world.collision(actor.polygon)
+    
+    
+    # collides, vector = p1.collision(p2)
+    # print collides
+    
+    # collides, offset = world.collision(actor.polygon)
+    # ##############
     
 def drawLine(line):
     glVertex2f(line.x1, line.y1)
@@ -154,26 +154,26 @@ def drawLine(line):
     #global translateZ
     #translateZ = -y*10
     
-pressedLeft = False
-pressedRight = False
-pressedJump = False
-
-
 @window.event
 def on_key_press(symbol, modifiers):
-    global pressedLeft
-    global pressedRight
-    global pressedJump
+    global actor
+    
+    if symbol == key.LEFT:
+        actor.controls.pressedLeft = True
+    if symbol == key.RIGHT:
+        actor.controls.pressedRight = True
+    if symbol == key.UP:
+        actor.controls.pressedUp = True
+    if symbol == key.DOWN:
+        actor.controls.pressedDown = True
+    if symbol == key.SPACE:
+        actor.controls.pressedJump = True
+        
     global polygon2
     global debug
-    if symbol == key.LEFT:
-        pressedLeft = True
-    if symbol == key.RIGHT:
-        pressedRight = True
-    if symbol == key.SPACE:
-        pressedJump = True
+
     if symbol == key.A:
-        polygon2 = createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
+        polygon2 = Polygon.createBoundingBoxPolygon(Vector(-20, -20), Vector(40, 0))
         polygon2.midpointDisplacement(8)
         polygon2.midpointDisplacement(6)
         polygon2.triangulate()
@@ -182,27 +182,25 @@ def on_key_press(symbol, modifiers):
         
 @window.event
 def on_key_release(symbol, modifiers):
-    global pressedLeft
-    global pressedRight
-    global pressedJump
+    global actor
     if symbol == key.LEFT:
-        pressedLeft = False
+        actor.controls.pressedLeft = False
     if symbol == key.RIGHT:
-        pressedRight = False
+        actor.controls.pressedRight = False
+    if symbol == key.UP:
+        actor.controls.pressedUp = False
+    if symbol == key.DOWN:
+        actor.controls.pressedDown = False
     if symbol == key.SPACE:
-        pressedJump = False
+        actor.controls.pressedJump = False
     
 def update(dt):
     # print dt
     
-    global actor
-    global pressedLeft
-    global pressedRight
-    global pressedJump
+    global actor    
+    actor.update(dt)
     
-    # actor.update(dt, pressedRight, pressedLeft, pressedJump)
-    
-    # collides, offset = world.collision(actor)
+    # collides, offset = world.collision(actor.polygon)
     # newLocation = actor.location
     # if collides:
         # newLocation = newLocation.add(offset)
