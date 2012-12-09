@@ -8,8 +8,8 @@ from Controls import Controls
 class Actor:
     def __init__(self):
         self.speed = Vector(0, 0)
-        self.width = 5
-        self.height = 15
+        self.width = 1.
+        self.height = 15.
         self.canJump = True
         self.location = Vector(0, 11)
         self.updateLocation(Vector(0, 10))
@@ -44,19 +44,19 @@ class Actor:
             self.canJump = False
             self.accelerate(Vector(0, self.accJump), 1)
         
-        #TODO self.gravity(dt)
+        self.gravity(dt)
         
         if self.location.y < -700:
-            self.speed.y = 0
-            self.location = Vector(0, 0)
+            self.speed.y = 0.
+            self.location = Vector(0., 0.)
          
         self.applySpeed(dt)
         
         # TEST CODE
-        if self.controls.pressedUp:
-            self.updateLocation(self.location.add(Vector(0, 1)))
-        if self.controls.pressedDown:
-            self.updateLocation(self.location.add(Vector(0, -1)))
+        # if self.controls.pressedUp:
+            # self.updateLocation(self.location.add(Vector(0, 1)))
+        # if self.controls.pressedDown:
+            # self.updateLocation(self.location.add(Vector(0, -1)))
         
         self.updateLocation(self.location)
     
@@ -78,7 +78,7 @@ class Actor:
             self.speed.y = copysign(self.maxSpeedY, self.speed.y)
         
     def gravity(self, dt):
-        self.accelerate(Vector(0, -120), dt)
+        self.accelerate(Vector(0, -120.), dt)
         
     def applySpeed(self, dt):
         self.location.x = self.location.x + self.speed.x*dt

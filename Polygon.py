@@ -209,7 +209,7 @@ class Polygon:
             newAxis = None
             newDist = None
             axis = None
-            dist = sys.float_info.min
+            dist = -1
             for m in self.monotones:
                 newCollides, newAxis, newDist = m.__privateCollision__(other)
                 if newCollides:
@@ -226,7 +226,7 @@ class Polygon:
             newAxis = None
             newDist = None
             axis = None
-            dist = sys.float_info.min
+            dist = -1
             for t in self.triangles:
                 newCollides, newAxis, newDist = t.__privateCollision__(other)
                 if newCollides:

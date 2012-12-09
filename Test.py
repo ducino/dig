@@ -57,6 +57,12 @@ debug = 0
 actor = Actor()
 world = QuadNode()
 
+# polygon = Polygon()
+# polygon.addVertex(Vector(-100., -100.))
+# polygon.addVertex(Vector(100., -100.+random.randrange(-10., 10.)))
+# polygon.addVertex(Vector(50., 0.))
+# world.add(polygon)
+
 polygon = Polygon.createBoundingBoxPolygon(Vector(-100, -100), Vector(100, 0))
 polygon.midpointDisplacement(10)
 polygon.midpointDisplacement(10)
@@ -123,20 +129,30 @@ def on_draw():
     world.draw(actor.view(window))
     
     # TEST CODE
-    random.seed(int(time.clock()))
-    p1 = Polygon()
-    p1.addVertex(Vector(-10+random.randrange(-5, 5), 10+random.randrange(-5, 5)))
-    p1.addVertex(Vector(random.randrange(-5, 5), 20+random.randrange(-5, 5)))
-    p1.addVertex(Vector(10+random.randrange(-5, 5), 10+random.randrange(-5, 5)))
-    p1.draw()
+    # random.seed(int(time.clock()))
+    # p1 = Polygon()
+    # p1.addVertex(Vector(-10+random.randrange(-5, 5), 10+random.randrange(-5, 5)))
+    # p1.addVertex(Vector(random.randrange(-5, 5), 20+random.randrange(-5, 5)))
+    # p1.addVertex(Vector(10+random.randrange(-5, 5), 10+random.randrange(-5, 5)))
+    # p1.draw()
     
-    p2 = Polygon()
-    p2.addVertex(Vector(-8+random.randrange(-5, 5), 8+random.randrange(-5, 5)))
-    p2.addVertex(Vector(random.randrange(-5, 5), 16+random.randrange(-5, 5)))
-    p2.addVertex(Vector(8+random.randrange(-5, 5), 8+random.randrange(-5, 5)))
-    p2.draw()
+    # p2 = Polygon()
+    # p2.addVertex(Vector(-8+random.randrange(-5, 5), 8+random.randrange(-5, 5)))
+    # p2.addVertex(Vector(random.randrange(-5, 5), 16+random.randrange(-5, 5)))
+    # p2.addVertex(Vector(8+random.randrange(-5, 5), 8+random.randrange(-5, 5)))
+    # p2.draw()
     
-    collides, offset = world.collision(actor.polygon)
+    # TEST CODE: collision vector
+    # collides, offset = world.collision(actor.polygon)
+    
+    # glLineWidth(5)
+    # glColor3f(.2, .2, 1.)
+    # factor=0.2
+    # glBegin(GL_LINES)
+    # glVertex2f(actor.location.x, actor.location.y)
+    # glVertex2f(actor.location.x+actor.speed.x*factor, actor.location.y+actor.speed.y*factor)
+    # glEnd()
+    # glLineWidth(1)
     
     
     # collides, vector = p1.collision(p2)
@@ -200,15 +216,18 @@ def update(dt):
     global actor    
     actor.update(dt)
     
-    # collides, offset = world.collision(actor.polygon)
-    # newLocation = actor.location
-    # if collides:
-        # newLocation = newLocation.add(offset)
-        # # newLocation = offset
-        # actor.canJump = True
-        # actor.speed.y = 0
-        
-    # actor.updateLocation(newLocation)
+    collides, offset = world.collision(actor.polygon)
+    
+    newLocation = actor.location
+    if collides:
+        dot = actor.speed.dot(offset)
+        if dot > 0:
+            offset = offset.multiply(-1)
+        newLocation = newLocation.add(offset)
+        actor.canJump = True
+        actor.speed.y = 0
+              
+    actor.updateLocation(newLocation)
     
     
 pyglet.clock.schedule_interval(update, 0.025)

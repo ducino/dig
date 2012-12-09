@@ -98,25 +98,19 @@ class QuadNode:
         if len(offsets) == 0:
             return False, None
         
-        max = 0
+        max = -1
         result = None
-        # for offset in offsets:
-            # if offset.length() > max:
-                # result = offset
-                # max = offset.length()
-        
-        obj = None
-        for i in range(len(offsets)):
-            offset = offsets[i]
+        for offset in offsets:
             if offset.length() > max:
-                obj = objects[i]
                 result = offset
                 max = offset.length()
                 
-        #obj.draw()
+        test = result
+        if Vector(0, 1).dot(result) < 0:
+            test = test.multiply(-1)
                 
         p = Vector( (object.bbox.minX+object.bbox.maxX)/2, object.bbox.minY)
-        t = p.add(result)
+        t = p.add(test)
         glPointSize(10)
         glBegin(GL_POINTS)
         glVertex2f(p.x, p.y)
